@@ -1,0 +1,59 @@
+# Ambiente local do relay de Pagamentos: SQL Server, RabbitMQ e Toxiproxy.
+# Credenciais vêm do .env (copie de .env.example); os testes automatizados usam Testcontainers e não dependem
+# deste arquivo.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-CU32-ubuntu-20.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?defina MSSQL_SA_PASSWORD no .env}
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?defina RABBITMQ_DEFAULT_USER no .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?defina RABBITMQ_DEFAULT_PASS no .env}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # Proxy "rabbitmq" (docker/toxiproxy.json): a aplicação aponta para a porta 8666 em vez da 5672 para sofrer os
+  # toxics aplicados pela API de controle.
+  #toxiproxy:
+  #  image: ghcr.io/shopify/toxiproxy:2.10.0
+  #  command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+  #  depends_on:
+  #    rabbitmq:
+ #       condition: service_healthy
+ #   ports:
+ #     - "${TOXIPROXY_API_PORT:-8474}:8474"
+ #     - "${TOXIPROXY_RABBITMQ_PORT:-8666}:8666"
+ #   volumes:
+ #     - ./docker/toxiproxy.json:/config/toxiproxy.json:ro
+ #   healthcheck:
+ #     test: ["CMD", "/toxiproxy-cli", "list"]
+ #     interval: 5s
+ #     timeout: 3s
+ #     retries: 10
+
+volumes:
+  sqlserver-data:
+  rabbitmq-data:
