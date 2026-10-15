@@ -1,0 +1,37 @@
+@startuml
+title Padrão Outbox Assíncrono At-Least-Once
+participant App
+database "Base principal" as DB
+
+queue Fila as fila
+
+activate App
+    App -> DB : Salvar dados principais da transação
+    activate DB
+        App -> DB : Enviar dados de outbox
+        DB --> App : Confirmação de gravação
+    deactivate DB
+    create participant "Outbox Service" as OutboxAsync
+    App -->> OutboxAsync : Dispara envio de mensagem para fila
+deactivate App
+loop Confirmação de recebimento
+        OutboxAsync -> fila : Enviar dados para fila
+        activate OutboxAsync
+            fila --> OutboxAsync : Confirmação de recebimento
+            OutboxAsync -> DB : Atualizar status de envio
+        destroy OutboxAsync
+end
+
+alt Inicialização da aplicação
+App -> DB: Consulta outbox pendentes
+DB --> App: Retorna dados pendentes
+create participant "Outbox Service" as OutboxAsync1
+App-->> OutboxAsync1: Enfileirar dados pendentes
+loop Confirmação de recebimento
+activate OutboxAsync1
+OutboxAsync1 -> fila : Enviar dados para fila
+fila --> OutboxAsync1 : Confirmação de recebimento
+deactivate OutboxAsync1
+end
+end
+@enduml
