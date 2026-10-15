@@ -1,13 +1,13 @@
-package br.com.db1.outboxinbox;
+package br.com.db1.demooutboxinbox;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class OutboxInboxApplicationTests {
+class DemooutboxinboxApplicationTests {
 
-    @Test
-    void contextLoads() {
-    }
+	@Test
+	void contextLoads() {
+	}
 
 }

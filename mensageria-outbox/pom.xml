@@ -45,20 +45,20 @@
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
             <scope>runtime</scope>
-            <version>13.4.0.jre11</version>
+            <version>${mssql-jdbc.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
-            <version>6.0.3</version>
+            <version>5.11.0</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <scope>test</scope>
-            <version>1.5.38</version>
+            <version>${logback.version}</version>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -100,11 +100,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
                 <dependencies>
                     <dependency>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>extra-enforcer-rules</artifactId>
-                        <version>${extra-enforcer-rules.version}</version>
+                        <version>1.8.0</version>
                     </dependency>
                 </dependencies>
                 <executions>
@@ -148,4 +149,23 @@
             </plugin>
         </plugins>
     </build>
+
+    <repositories>
+        <repository>
+            <id>JFrog-Sisprime</id>
+            <name>JFrog - Maven artifact</name>
+            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>JFrog-Sisprime</id>
+            <name>JFrog - Maven artifact</name>
+            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
+            <layout>default</layout>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 </project>
