@@ -20,9 +20,13 @@ public final class RelayFactory {
     public static Relay create(RelayConfig config, DataSource dataSource, MessagePublisher publisher,
             MeterRegistry meterRegistry, String holderId) {
         OutboxDialect dialect = new SqlServerOutboxDialect();
-        return switch (config.strategy()) {
-            case CLAIM -> new ClaimRelay(config, dataSource, dialect, publisher, meterRegistry, holderId);
-            case READ_POINT -> new ReadPointRelay(config, dataSource, dialect, publisher, meterRegistry, holderId);
-        };
+        switch (config.strategy()) {
+            case CLAIM:
+                return new ClaimRelay(config, dataSource, dialect, publisher, meterRegistry, holderId);
+            case READ_POINT:
+                return new ReadPointRelay(config, dataSource, dialect, publisher, meterRegistry, holderId);
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + config.strategy());
+        }
     }
 }

@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -22,7 +23,7 @@ class OutboxRetentionTest {
 
     /** Dialeto que devolve as contagens dadas, uma por chamada de remoção, e registra o método chamado. */
     private OutboxDialect dialect(Integer... deletions) {
-        Iterator<Integer> results = List.of(deletions).iterator();
+        Iterator<Integer> results = Arrays.asList(deletions).iterator();
         return (OutboxDialect) Proxy.newProxyInstance(OutboxDialect.class.getClassLoader(),
                 new Class<?>[] {OutboxDialect.class}, (proxy, method, args) -> {
                     calls.add(method.getName() + "(" + args[1] + "," + args[2] + ")");
@@ -47,7 +48,7 @@ class OutboxRetentionTest {
         OutboxRetention retention = retention(RelayStrategyType.CLAIM, dialect(10, 10, 10, 5));
 
         assertEquals(35, retention.runNow(() -> true));
-        assertEquals(List.of("deleteSentByTimestamp(604800000,10)", "deleteSentByTimestamp(604800000,10)",
+        assertEquals(Arrays.asList("deleteSentByTimestamp(604800000,10)", "deleteSentByTimestamp(604800000,10)",
                 "deleteSentByTimestamp(604800000,10)", "deleteSentByTimestamp(604800000,10)"), calls);
     }
 
@@ -56,7 +57,7 @@ class OutboxRetentionTest {
         OutboxRetention retention = retention(RelayStrategyType.READ_POINT, dialect(3));
 
         assertEquals(3, retention.runNow(() -> true));
-        assertEquals(List.of("deleteBehindReadPoint(604800000,10)"), calls);
+        assertEquals(Arrays.asList("deleteBehindReadPoint(604800000,10)"), calls);
     }
 
     @Test

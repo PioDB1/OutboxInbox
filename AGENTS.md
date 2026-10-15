@@ -22,7 +22,7 @@ Documento de entrada do negócio: `spec-caso-a-outbox-inbox.md` (raiz). Contexto
 
 ## Stack principal
 
-- Java 21 (versão mínima suportada).
+- Java 21 (versão mínima suportada) nos módulos `mensageria-inbox`, `pagamentos`, `extrato` e `reconciliacao`; o `mensageria-outbox` tem Java 8 (bytecode e API) como piso, e a sua suíte é verificada nos JDKs 8, 11, 17, 21 e 25. O build do repositório roda em JDK 21.
 - Maven multi-módulo.
 - Spring Boot 3.x nas aplicações Pagamentos e Extrato; Pagamentos consome o `mensageria-outbox` e Extrato consome o `mensageria-inbox`, cada um por adaptador fino.
 - RabbitMQ com filas quorum, publisher confirms e ack manual no consumidor.
@@ -34,12 +34,12 @@ Documento de entrada do negócio: `spec-caso-a-outbox-inbox.md` (raiz). Contexto
 Estrutura-alvo, um módulo Maven por domínio na raiz:
 
 ```
-pom.xml              agregador Maven (Java 21, dependencyManagement, pluginManagement, enforcer)
+pom.xml              agregador Maven (Java 21 nos módulos, exceto o mensageria-outbox; build em JDK 21; dependencyManagement, pluginManagement, enforcer)
 compose.yaml         SQL Server, RabbitMQ e Toxiproxy para uso local
 .env.example         variáveis do compose.yaml (o .env local não é versionado)
 docker/              configuração do Toxiproxy usada pelo compose.yaml
 docs/adr/            ADRs e índice
-mensageria-outbox/   lado produtor, sem Spring Boot (implementado)
+mensageria-outbox/   lado produtor, sem Spring Boot, Java 8 como piso (implementado)
 mensageria-inbox/    lado consumidor, sem Spring Boot
 pagamentos/          aplicação Spring Boot (produtor)
 extrato/             aplicação Spring Boot (consumidor)
@@ -74,7 +74,10 @@ Build Maven multi-módulo, a partir da raiz (não há wrapper `mvnw` nem plugin 
 ```
 mvn clean verify                 # compila e executa os testes de todos os módulos
 mvn -pl <módulo> -am test        # testa um módulo e suas dependências
+mvn -pl mensageria-outbox verify -Djvm=<JDK_HOME>/bin/java   # suíte do mensageria-outbox em um JDK da matriz (8, 11, 17, 21, 25)
 ```
+
+O Maven e o compilador rodam em JDK 21; `-Djvm` troca só a JVM em que surefire e failsafe executam os testes.
 
 Convenção de testes: `*Test` (surefire, sem Docker) e `*IT` (failsafe, com Testcontainers; sem Docker em execução eles são ignorados). O failsafe roda com `-Xmx256m -XX:MaxDirectMemorySize=64m`.
 

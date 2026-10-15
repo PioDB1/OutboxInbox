@@ -224,7 +224,7 @@ abstract class RelayRunner implements Relay {
 
     private boolean pause(Duration wait) {
         try {
-            Thread.sleep(wait.toMillis(), wait.toNanosPart() % 1_000_000);
+            Thread.sleep(wait.toMillis(), wait.getNano() % 1_000_000);
             return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

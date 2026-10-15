@@ -16,7 +16,23 @@ import java.util.function.LongSupplier;
  */
 public final class BackoffPolicy {
 
-    private record State(int failures, long nextAttemptNanos) {
+    private static final class State {
+
+        private final int failures;
+        private final long nextAttemptNanos;
+
+        State(int failures, long nextAttemptNanos) {
+            this.failures = failures;
+            this.nextAttemptNanos = nextAttemptNanos;
+        }
+
+        int failures() {
+            return failures;
+        }
+
+        long nextAttemptNanos() {
+            return nextAttemptNanos;
+        }
     }
 
     private final long initialNanos;

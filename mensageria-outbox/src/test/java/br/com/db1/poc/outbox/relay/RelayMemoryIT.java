@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -77,7 +78,7 @@ class RelayMemoryIT extends SqlServerIT {
         assertEquals(0, db.pendingCount(strategy));
         System.out.printf("%s: heap usado após %s linhas publicadas = %s MiB%n", strategy.value(),
                 Arrays.toString(MEASUREMENT_POINTS),
-                Arrays.stream(heap).mapToObj(h -> String.valueOf(h / HeapProbe.MEBIBYTE)).toList());
+                Arrays.stream(heap).mapToObj(h -> String.valueOf(h / HeapProbe.MEBIBYTE)).collect(Collectors.toList()));
         long growth = heap[2] - heap[1];
         assertTrue(growth <= MAX_GROWTH, "o heap cresceu " + growth / HeapProbe.MEBIBYTE
                 + " MiB entre o segundo e o terceiro ponto de medição");
@@ -85,14 +86,13 @@ class RelayMemoryIT extends SqlServerIT {
 
     /** Insere as linhas pendentes em uma única instrução, com 500 {@code aggregateKey} e payload de 1 KiB. */
     private void insertPending() {
-        db.execute("""
-                INSERT INTO outbox (message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver,
-                                    occurred_at, trace_id, payload)
-                SELECT NEWID(), NEWID(), CONCAT('idem-', n), CONCAT('agg-', n % 500), 'PagamentoRecebido', 1,
-                       SYSUTCDATETIME(), 'trace-carga',
-                       CAST(REPLICATE(CAST('x' AS VARCHAR(MAX)), 1024) AS VARBINARY(MAX))
-                  FROM (SELECT TOP (%d) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
-                          FROM sys.all_objects a CROSS JOIN sys.all_objects b) AS numbers
-                 ORDER BY n""".formatted(TOTAL));
+        db.execute("INSERT INTO outbox (message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver,\n"
+                + "                    occurred_at, trace_id, payload)\n"
+                + "SELECT NEWID(), NEWID(), CONCAT('idem-', n), CONCAT('agg-', n % 500), 'PagamentoRecebido', 1,\n"
+                + "       SYSUTCDATETIME(), 'trace-carga',\n"
+                + "       CAST(REPLICATE(CAST('x' AS VARCHAR(MAX)), 1024) AS VARBINARY(MAX))\n"
+                + "  FROM (SELECT TOP (" + TOTAL + ") ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n\n"
+                + "          FROM sys.all_objects a CROSS JOIN sys.all_objects b) AS numbers\n"
+                + " ORDER BY n");
     }
 }

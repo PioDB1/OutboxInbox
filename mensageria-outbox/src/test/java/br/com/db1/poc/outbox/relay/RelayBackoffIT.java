@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.support.Await;
+import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
 import br.com.db1.poc.outbox.support.TestEnvelopes;
@@ -32,7 +33,7 @@ class RelayBackoffIT extends RelayIT {
 
     private List<Envelope> insert(int count) {
         List<Envelope> envelopes = new ArrayList<>();
-        try (var transaction = db.open()) {
+        try (OutboxDb.Transaction transaction = db.open()) {
             for (int i = 0; i < count; i++) {
                 Envelope envelope = TestEnvelopes.of("agg-" + (i % 10));
                 transaction.insert(envelope);
@@ -176,11 +177,18 @@ class RelayBackoffIT extends RelayIT {
     @ParameterizedTest
     @MethodSource("toxics")
     void redeInstavelSegueOBackoffENaoPerdeMensagens(RelayStrategyType strategy, String toxic) throws IOException {
-        Toxic applied = switch (toxic) {
-            case "latency" -> broker.proxy().toxics().latency("instavel", ToxicDirection.DOWNSTREAM, 5_000);
-            case "timeout" -> broker.proxy().toxics().timeout("instavel", ToxicDirection.DOWNSTREAM, 0);
-            default -> broker.proxy().toxics().resetPeer("instavel", ToxicDirection.DOWNSTREAM, 0);
-        };
+        Toxic applied;
+        switch (toxic) {
+            case "latency":
+                applied = broker.proxy().toxics().latency("instavel", ToxicDirection.DOWNSTREAM, 5_000);
+                break;
+            case "timeout":
+                applied = broker.proxy().toxics().timeout("instavel", ToxicDirection.DOWNSTREAM, 0);
+                break;
+            default:
+                applied = broker.proxy().toxics().resetPeer("instavel", ToxicDirection.DOWNSTREAM, 0);
+                break;
+        }
         List<Envelope> envelopes = insert(5);
         ScriptedPublisher publisher = new ScriptedPublisher(rabbitPublisher());
         Relay relay = relay(strategy, publisher, "backoff.initial", "100ms", "backoff.max", "1s");

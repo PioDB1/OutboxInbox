@@ -8,7 +8,7 @@ metadata:
 
 # Mapa funcional
 
-Projeto greenfield sem código: a evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21, Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo.
+Projeto greenfield sem código: a evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21 nos domínios, exceto o Mensageria Outbox, que tem Java 8 como piso; Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo.
 
 A mensageria é dividida em dois domínios independentes, um por lado da entrega: o produtor (`mensageria-outbox`) e o consumidor (`mensageria-inbox`). Nenhum depende do outro; cada um carrega a própria definição do envelope padrão.
 
@@ -35,7 +35,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - SQL Server — banco da outbox, do lease e do relay de Pagamentos, executado em Docker; as duas estratégias de relay dependem dos recursos `UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion`/`min_active_rowversion()`. O H2 não oferece esses recursos e não é usado para o relay.
 - RabbitMQ — broker com filas quorum e publisher confirms (acessado por adaptador).
 - Micrometer — métricas de publicação.
-- Java 21 e Maven multi-módulo — plataforma e build; sem Spring Boot no módulo, com adaptador fino para Spring Boot 3.x.
+- Java 8 (piso) e Maven multi-módulo — plataforma e build; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no módulo, com adaptador fino para Spring Boot 3.x. Os demais domínios seguem em Java 21.
 
 **Dependências técnicas do domínio:**
 - Ambiente Docker com SQL Server e RabbitMQ (e Toxiproxy para testes) — sem ele o relay não é executável nem testável contra os recursos do SQL Server.

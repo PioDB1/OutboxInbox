@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /** Seleção de estratégia e comportamento próprio da estratégia de ponto de leitura (TC-23, TC-26 a TC-28). */
@@ -64,7 +65,7 @@ class ReadPointRelayIT extends RelayIT {
 
         relay.runOnce();
 
-        assertEquals(List.of(r1.messageId(), r3.messageId()), publisher.delivered().stream().map(m -> m.messageId()).toList());
+        assertEquals(Arrays.asList(r1.messageId(), r3.messageId()), publisher.delivered().stream().map(m -> m.messageId()).collect(Collectors.toList()));
         assertArrayEquals(db.rvOf(r1.messageId()), db.readPoint());
         assertFalse(db.isSent(RelayStrategyType.READ_POINT, r2.messageId()));
     }
@@ -85,8 +86,8 @@ class ReadPointRelayIT extends RelayIT {
         publisher.stopFailing();
         runUntil(relay, "ponto no fim", () -> Arrays.equals(db.rvOf(r3.messageId()), db.readPoint()));
 
-        assertEquals(List.of(r1.messageId(), r3.messageId(), r2.messageId()),
-                publisher.delivered().stream().map(m -> m.messageId()).toList());
+        assertEquals(Arrays.asList(r1.messageId(), r3.messageId(), r2.messageId()),
+                publisher.delivered().stream().map(m -> m.messageId()).collect(Collectors.toList()));
     }
 
     /** TC-27: um relay novo retoma a leitura a partir do ponto gravado no banco. */
@@ -108,7 +109,7 @@ class ReadPointRelayIT extends RelayIT {
 
         assertEquals(1, second.runOnce());
 
-        assertEquals(List.of(r3.messageId()), secondPublisher.delivered().stream().map(m -> m.messageId()).toList());
+        assertEquals(Arrays.asList(r3.messageId()), secondPublisher.delivered().stream().map(m -> m.messageId()).collect(Collectors.toList()));
         assertArrayEquals(db.rvOf(r3.messageId()), db.readPoint());
     }
 

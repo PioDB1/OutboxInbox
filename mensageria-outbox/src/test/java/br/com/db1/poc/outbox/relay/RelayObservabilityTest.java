@@ -14,6 +14,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ import org.slf4j.MDC;
  */
 class RelayObservabilityTest {
 
-    private static final List<String> MDC_KEYS = List.of("messageId", "correlationId", "aggregateKey", "traceId");
+    private static final List<String> MDC_KEYS = Arrays.asList("messageId", "correlationId", "aggregateKey", "traceId");
 
     private final InMemoryDialect dialect = new InMemoryDialect();
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -43,10 +44,14 @@ class RelayObservabilityTest {
         properties.setProperty("outbox.relay.backoff.initial", "20ms");
         properties.setProperty("outbox.relay.backoff.max", "40ms");
         RelayConfig config = RelayConfig.fromProperties(properties);
-        return switch (strategy) {
-            case CLAIM -> new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
-            case READ_POINT -> new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
-        };
+        switch (strategy) {
+            case CLAIM:
+                return new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
+            case READ_POINT:
+                return new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
     }
 
     private double gauge(String name) {

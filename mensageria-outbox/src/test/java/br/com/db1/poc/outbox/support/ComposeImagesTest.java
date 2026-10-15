@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,15 +22,15 @@ class ComposeImagesTest {
 
     @Test
     void imagensDoComposeCoincidemComAsDosTestes() throws IOException {
-        Path compose = Path.of(System.getProperty("basedir", "."), "..", "compose.yaml").normalize();
-        String content = Files.readString(compose);
+        Path compose = Paths.get(System.getProperty("basedir", "."), "..", "compose.yaml").normalize();
+        String content = new String(Files.readAllBytes(compose), StandardCharsets.UTF_8);
         Matcher matcher = IMAGE.matcher(content);
         List<String> images = new ArrayList<>();
         while (matcher.find()) {
             images.add(matcher.group(1));
         }
 
-        assertEquals(List.of(Images.SQL_SERVER, Images.RABBITMQ, Images.TOXIPROXY), images);
+        assertEquals(Arrays.asList(Images.SQL_SERVER, Images.RABBITMQ, Images.TOXIPROXY), images);
         assertFalse(images.stream().anyMatch(image -> image.endsWith(":latest") || !image.contains(":")),
                 "imagem sem tag fixa: " + images);
     }

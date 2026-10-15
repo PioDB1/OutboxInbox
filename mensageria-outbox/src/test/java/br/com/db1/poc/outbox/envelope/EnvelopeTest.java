@@ -21,6 +21,14 @@ class EnvelopeTest {
 
     private enum Campo { MESSAGE_ID, CORRELATION_ID, IDEMPOTENCY_KEY, AGGREGATE_KEY, TYPE, OCCURRED_AT, PAYLOAD, TRACE_ID }
 
+    private static String repeat(String text, int times) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < times; i++) {
+            builder.append(text);
+        }
+        return builder.toString();
+    }
+
     private static Envelope envelope(
             UUID messageId, UUID correlationId, String idempotencyKey, String aggregateKey, String type,
             Instant occurredAt, byte[] payload, String traceId) {
@@ -66,24 +74,24 @@ class EnvelopeTest {
     @Test
     void rejeitaTextoAcimaDoTamanhoDaColuna() {
         assertThrows(IllegalArgumentException.class, () -> envelope(
-                MESSAGE_ID, CORRELATION_ID, "idem-1", "a".repeat(101), "PagamentoRecebido",
+                MESSAGE_ID, CORRELATION_ID, "idem-1", repeat("a", 101), "PagamentoRecebido",
                 OCCURRED_AT, new byte[] {1}, "trace-1"));
         assertThrows(IllegalArgumentException.class, () -> envelope(
-                MESSAGE_ID, CORRELATION_ID, "i".repeat(201), "pagamento-1", "PagamentoRecebido",
+                MESSAGE_ID, CORRELATION_ID, repeat("i", 201), "pagamento-1", "PagamentoRecebido",
                 OCCURRED_AT, new byte[] {1}, "trace-1"));
         assertThrows(IllegalArgumentException.class, () -> envelope(
-                MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1", "t".repeat(101),
+                MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1", repeat("t", 101),
                 OCCURRED_AT, new byte[] {1}, "trace-1"));
         assertThrows(IllegalArgumentException.class, () -> envelope(
                 MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1", "PagamentoRecebido",
-                OCCURRED_AT, new byte[] {1}, "x".repeat(65)));
+                OCCURRED_AT, new byte[] {1}, repeat("x", 65)));
     }
 
     @Test
     void aceitaTextoNoTamanhoExatoDaColuna() {
         assertDoesNotThrow(() -> envelope(
-                MESSAGE_ID, CORRELATION_ID, "i".repeat(200), "a".repeat(100), "t".repeat(100),
-                OCCURRED_AT, new byte[0], "x".repeat(64)));
+                MESSAGE_ID, CORRELATION_ID, repeat("i", 200), repeat("a", 100), repeat("t", 100),
+                OCCURRED_AT, new byte[0], repeat("x", 64)));
     }
 
     @Test
@@ -122,6 +130,69 @@ class EnvelopeTest {
 
         assertArrayEquals(new byte[] {1, 2, 3}, envelope.payload());
         assertNotSame(envelope.payload(), envelope.payload());
+    }
+
+    @Test
+    void mensagemDeErroIdentificaOCampoInvalido() {
+        IllegalArgumentException nulo = assertThrows(IllegalArgumentException.class, () -> comCampoNulo(Campo.TYPE));
+        IllegalArgumentException vazio = assertThrows(IllegalArgumentException.class, () -> envelope(
+                MESSAGE_ID, CORRELATION_ID, "", "pagamento-1", "PagamentoRecebido", OCCURRED_AT, new byte[] {1},
+                "trace-1"));
+        IllegalArgumentException longo = assertThrows(IllegalArgumentException.class, () -> envelope(
+                MESSAGE_ID, CORRELATION_ID, "idem-1", repeat("a", 101), "PagamentoRecebido", OCCURRED_AT,
+                new byte[] {1}, "trace-1"));
+
+        assertEquals("type é obrigatório", nulo.getMessage());
+        assertEquals("idempotencyKey não pode ser vazio", vazio.getMessage());
+        assertEquals("aggregateKey excede 100 caracteres (101)", longo.getMessage());
+    }
+
+    @Test
+    void acessoresDevolvemOsValoresInformados() {
+        Envelope envelope = envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1", "PagamentoRecebido",
+                OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1");
+
+        assertEquals(MESSAGE_ID, envelope.messageId());
+        assertEquals(CORRELATION_ID, envelope.correlationId());
+        assertEquals("idem-1", envelope.idempotencyKey());
+        assertEquals("pagamento-1", envelope.aggregateKey());
+        assertEquals("PagamentoRecebido", envelope.type());
+        assertEquals((short) 1, envelope.schemaVersion());
+        assertEquals(OCCURRED_AT, envelope.occurredAt());
+        assertArrayEquals(new byte[] {1, 2, 3}, envelope.payload());
+        assertEquals("trace-1", envelope.traceId());
+    }
+
+    @Test
+    void toStringSegueOFormatoDoRegistroSemExporOPayload() {
+        assertEquals("Envelope[messageId=" + MESSAGE_ID + ", correlationId=" + CORRELATION_ID
+                + ", idempotencyKey=idem-1, aggregateKey=pagamento-1, type=PagamentoRecebido, schemaVersion=1, "
+                + "occurredAt=" + OCCURRED_AT + ", payloadBytes=3, traceId=trace-1]", valido().toString());
+    }
+
+    @Test
+    void igualdadeDiferenciaCadaCampo() {
+        Envelope base = valido();
+
+        assertEquals(base, base);
+        assertNotEquals(base, null);
+        assertNotEquals(base, "envelope");
+        assertNotEquals(base, envelope(UUID.randomUUID(), CORRELATION_ID, "idem-1", "pagamento-1",
+                "PagamentoRecebido", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, UUID.randomUUID(), "idem-1", "pagamento-1",
+                "PagamentoRecebido", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, CORRELATION_ID, "idem-2", "pagamento-1",
+                "PagamentoRecebido", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-2",
+                "PagamentoRecebido", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1",
+                "PagamentoEstornado", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1",
+                "PagamentoRecebido", OCCURRED_AT.plusSeconds(1), new byte[] {1, 2, 3}, "trace-1"));
+        assertNotEquals(base, envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1",
+                "PagamentoRecebido", OCCURRED_AT, new byte[] {1, 2, 3}, "trace-2"));
+        assertNotEquals(base, new Envelope(MESSAGE_ID, CORRELATION_ID, "idem-1", "pagamento-1",
+                "PagamentoRecebido", (short) 2, OCCURRED_AT, new byte[] {1, 2, 3}, "trace-1"));
     }
 
     @Test

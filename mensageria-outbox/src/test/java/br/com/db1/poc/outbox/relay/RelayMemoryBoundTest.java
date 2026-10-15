@@ -48,10 +48,17 @@ class RelayMemoryBoundTest {
         RelayConfig config = RelayConfig.fromProperties(properties);
         MessagePublisher publisher = new DiscardingPublisher();
         SimpleMeterRegistry meters = new SimpleMeterRegistry();
-        Relay relay = switch (strategy) {
-            case CLAIM -> new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
-            case READ_POINT -> new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
-        };
+        Relay relay;
+        switch (strategy) {
+            case CLAIM:
+                relay = new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
+                break;
+            case READ_POINT:
+                relay = new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, "r");
+                break;
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
 
         long published = 0;
         long[] heap = new long[MEASUREMENT_POINTS.length];

@@ -19,14 +19,48 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 class RabbitMessagePublisherTest {
 
-    private record Published(String exchange, String routingKey, boolean mandatory, AMQP.BasicProperties properties,
-            byte[] body) {
+    private static final class Published {
+        private final String exchange;
+        private final String routingKey;
+        private final boolean mandatory;
+        private final AMQP.BasicProperties properties;
+        private final byte[] body;
+
+        Published(String exchange, String routingKey, boolean mandatory, AMQP.BasicProperties properties,
+                byte[] body) {
+            this.exchange = exchange;
+            this.routingKey = routingKey;
+            this.mandatory = mandatory;
+            this.properties = properties;
+            this.body = body;
+        }
+
+        String exchange() {
+            return exchange;
+        }
+
+        String routingKey() {
+            return routingKey;
+        }
+
+        boolean mandatory() {
+            return mandatory;
+        }
+
+        AMQP.BasicProperties properties() {
+            return properties;
+        }
+
+        byte[] body() {
+            return body;
+        }
     }
 
     /** Canal simulado: registra as publicações e responde ao confirm conforme configurado. */
@@ -45,8 +79,10 @@ class RabbitMessagePublisherTest {
         @Override
         public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) throws Throwable {
             switch (method.getName()) {
-                case "addReturnListener" -> returnListener = (ReturnListener) args[0];
-                case "basicPublish" -> {
+                case "addReturnListener":
+                    returnListener = (ReturnListener) args[0];
+                    return null;
+                case "basicPublish":
                     Published call = new Published((String) args[0], (String) args[1], (Boolean) args[2],
                             (AMQP.BasicProperties) args[3], (byte[]) args[4]);
                     published.add(call);
@@ -54,30 +90,33 @@ class RabbitMessagePublisherTest {
                         returnListener.handleReturn(312, "NO_ROUTE", call.exchange(), call.routingKey(),
                                 call.properties(), call.body());
                     }
-                }
-                case "waitForConfirms" -> {
+                    return null;
+                case "waitForConfirms":
                     if (confirmTimesOut) {
                         throw new TimeoutException();
                     }
                     return confirm;
-                }
-                case "isOpen" -> {
+                case "isOpen":
                     return open;
-                }
-                case "close" -> open = false;
-                default -> {
+                case "close":
+                    open = false;
                     return null;
-                }
+                default:
+                    return null;
             }
-            return null;
         }
     }
 
     private static Connection connectionOf(FakeChannel channel) {
-        InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
-            case "createChannel" -> channel.channel();
-            case "isOpen" -> true;
-            default -> null;
+        InvocationHandler handler = (proxy, method, args) -> {
+            switch (method.getName()) {
+                case "createChannel":
+                    return channel.channel();
+                case "isOpen":
+                    return true;
+                default:
+                    return null;
+            }
         };
         return (Connection) Proxy.newProxyInstance(RabbitMessagePublisherTest.class.getClassLoader(),
                 new Class<?>[] {Connection.class}, handler);
@@ -109,7 +148,7 @@ class RabbitMessagePublisherTest {
         assertTrue(call.mandatory());
         assertArrayEquals(message.payload(), call.body());
 
-        var headers = call.properties().getHeaders();
+        Map<String, Object> headers = call.properties().getHeaders();
         assertEquals(message.messageId().toString(), headers.get("messageId"));
         assertEquals(message.correlationId().toString(), headers.get("correlationId"));
         assertEquals("idem-1", headers.get("idempotencyKey"));

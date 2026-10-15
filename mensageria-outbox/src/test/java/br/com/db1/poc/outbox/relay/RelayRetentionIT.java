@@ -17,6 +17,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -52,10 +53,17 @@ class RelayRetentionIT extends RelayIT {
     private Relay relayWith(RelayStrategyType strategy, OutboxDialect dialect, MessagePublisher publisher,
             String holderId, String... overrides) {
         RelayConfig config = RelayConfig.fromProperties(properties(strategy, overrides));
-        Relay relay = switch (strategy) {
-            case CLAIM -> new ClaimRelay(config, dataSource, dialect, publisher, meters, holderId);
-            case READ_POINT -> new ReadPointRelay(config, dataSource, dialect, publisher, meters, holderId);
-        };
+        Relay relay;
+        switch (strategy) {
+            case CLAIM:
+                relay = new ClaimRelay(config, dataSource, dialect, publisher, meters, holderId);
+                break;
+            case READ_POINT:
+                relay = new ReadPointRelay(config, dataSource, dialect, publisher, meters, holderId);
+                break;
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
         return closeAtEnd(relay);
     }
 
@@ -152,7 +160,7 @@ class RelayRetentionIT extends RelayIT {
         int removed = retention.runNow(() -> true);
 
         assertEquals(35, removed);
-        assertEquals(List.of(10, 10, 10, 5), deletions);
+        assertEquals(Arrays.asList(10, 10, 10, 5), deletions);
         assertEquals(0, db.outboxCount());
     }
 
@@ -178,7 +186,7 @@ class RelayRetentionIT extends RelayIT {
         List<Integer> holderDeletions = holder.equals("relay-a") ? deletionsA : deletionsB;
         List<Integer> otherDeletions = holder.equals("relay-a") ? deletionsB : deletionsA;
         assertTrue(!holderDeletions.isEmpty(), "o detentor deve executar a limpeza");
-        assertEquals(List.of(), otherDeletions);
+        assertEquals(Collections.emptyList(), otherDeletions);
     }
 
     private static void sleep(long millis) {

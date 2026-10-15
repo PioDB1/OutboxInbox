@@ -78,25 +78,31 @@ public final class OutboxDb {
 
     /** Linha enviada: {@code sent_at} preenchido (claim) ou {@code rv <= last_rv} (ponto de leitura). */
     public boolean isSent(RelayStrategyType strategy, UUID messageId) {
-        return switch (strategy) {
-            case CLAIM -> count("SELECT COUNT(*) FROM outbox WHERE message_id = ? AND sent_at IS NOT NULL",
-                    messageId.toString()) > 0;
-            case READ_POINT -> count("""
-                    SELECT COUNT(*) FROM outbox o
-                      JOIN outbox_read_point p ON p.relay_name = 'relay'
-                     WHERE o.message_id = ? AND o.rv <= p.last_rv""", messageId.toString()) > 0;
-        };
+        switch (strategy) {
+            case CLAIM:
+                return count("SELECT COUNT(*) FROM outbox WHERE message_id = ? AND sent_at IS NOT NULL",
+                        messageId.toString()) > 0;
+            case READ_POINT:
+                return count("SELECT COUNT(*) FROM outbox o\n"
+                        + "  JOIN outbox_read_point p ON p.relay_name = 'relay'\n"
+                        + " WHERE o.message_id = ? AND o.rv <= p.last_rv", messageId.toString()) > 0;
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
     }
 
     /** Linhas pendentes: {@code sent_at IS NULL} (claim) ou {@code rv > last_rv} (ponto de leitura). */
     public long pendingCount(RelayStrategyType strategy) {
-        return switch (strategy) {
-            case CLAIM -> count("SELECT COUNT(*) FROM outbox WHERE sent_at IS NULL");
-            case READ_POINT -> count("""
-                    SELECT COUNT(*) FROM outbox
-                     WHERE rv > COALESCE((SELECT last_rv FROM outbox_read_point WHERE relay_name = 'relay'),
-                                         0x0000000000000000)""");
-        };
+        switch (strategy) {
+            case CLAIM:
+                return count("SELECT COUNT(*) FROM outbox WHERE sent_at IS NULL");
+            case READ_POINT:
+                return count("SELECT COUNT(*) FROM outbox\n"
+                        + " WHERE rv > COALESCE((SELECT last_rv FROM outbox_read_point WHERE relay_name = 'relay'),\n"
+                        + "                     0x0000000000000000)");
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
     }
 
     /** Ponto de leitura gravado; oito bytes zero quando não há linha em {@code outbox_read_point}. */

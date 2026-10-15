@@ -1,5 +1,7 @@
 package br.com.db1.poc.outbox.schema;
 
+import br.com.db1.poc.outbox.internal.Texts;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -34,14 +36,14 @@ public final class OutboxSchemaInstaller {
             if (in == null) {
                 throw new IllegalStateException("Script de esquema ausente: " + SCRIPT);
             }
-            script = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            script = new String(readFully(in), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         List<String> batches = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         for (String line : script.split("\\R", -1)) {
-            if (line.strip().equalsIgnoreCase("GO")) {
+            if (Texts.strip(line).equalsIgnoreCase("GO")) {
                 addBatch(batches, current);
                 current.setLength(0);
             } else {
@@ -52,8 +54,18 @@ public final class OutboxSchemaInstaller {
         return batches;
     }
 
+    private static byte[] readFully(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
+    }
+
     private static void addBatch(List<String> batches, StringBuilder batch) {
-        if (!batch.toString().isBlank()) {
+        if (!Texts.isBlank(batch.toString())) {
             batches.add(batch.toString());
         }
     }

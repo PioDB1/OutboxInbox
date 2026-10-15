@@ -12,10 +12,13 @@ import br.com.db1.poc.outbox.support.TestEnvelopes;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -33,14 +36,13 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 class RelayObservationsIT extends RelayIT {
 
-    private static final Path REPORT = Path.of("target", "relay-observations.txt");
+    private static final Path REPORT = Paths.get("target", "relay-observations.txt");
     private static final int OUTAGE_ROWS = 50;
     private static final int LOCK_BATCH = 20;
-    private static final String ROW_LOCKS = """
-            SELECT COUNT(*) FROM sys.dm_tran_locks
-             WHERE resource_database_id = DB_ID() AND resource_type IN ('KEY', 'RID')
-               AND request_status = 'GRANT' AND request_mode IN ('U', 'X')
-               AND request_session_id <> @@SPID""";
+    private static final String ROW_LOCKS = "SELECT COUNT(*) FROM sys.dm_tran_locks\n"
+            + " WHERE resource_database_id = DB_ID() AND resource_type IN ('KEY', 'RID')\n"
+            + "   AND request_status = 'GRANT' AND request_mode IN ('U', 'X')\n"
+            + "   AND request_session_id <> @@SPID";
 
     private static double gauge(MeterRegistry registry, String name) {
         return registry.get(name).gauge().value();
@@ -54,7 +56,8 @@ class RelayObservationsIT extends RelayIT {
         brokerOutage(strategy, report);
         rowLocksDuringPublication(strategy, report);
         Files.createDirectories(REPORT.getParent());
-        Files.writeString(REPORT, report.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        Files.write(REPORT, report.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND);
         System.out.println(report);
     }
 
@@ -77,7 +80,7 @@ class RelayObservationsIT extends RelayIT {
         runUntil(relay, "as duas linhas publicadas", () -> publisher.delivered().size() >= 2);
         Set<UUID> delivered = new HashSet<>();
         publisher.delivered().forEach(m -> delivered.add(m.messageId()));
-        assertEquals(Set.of(fromT1.messageId(), fromT2.messageId()), delivered);
+        assertEquals(new HashSet<>(Arrays.asList(fromT1.messageId(), fromT2.messageId())), delivered);
         report.append("commit fora de ordem: mensagem de T1 pulada=nao, publicadas ao final=")
                 .append(delivered.size()).append('\n');
         db.execute("DELETE FROM outbox");

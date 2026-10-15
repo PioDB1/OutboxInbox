@@ -1,5 +1,6 @@
 package br.com.db1.poc.outbox.support;
 
+import br.com.db1.poc.outbox.internal.Texts;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import com.rabbitmq.client.ConnectionFactory;
 import eu.rekawek.toxiproxy.Proxy;
@@ -30,8 +31,36 @@ public final class TestInfrastructure {
     }
 
     /** RabbitMQ e Toxiproxy; o proxy {@code rabbitmq} encaminha para o broker pela rede compartilhada. */
-    public record Broker(RabbitMQContainer rabbit, ToxiproxyContainer toxiproxy, ToxiproxyClient client,
-            Proxy proxy) {
+    public static final class Broker {
+
+        private final RabbitMQContainer rabbit;
+        private final ToxiproxyContainer toxiproxy;
+        private final ToxiproxyClient client;
+        private final Proxy proxy;
+
+        public Broker(RabbitMQContainer rabbit, ToxiproxyContainer toxiproxy, ToxiproxyClient client,
+                Proxy proxy) {
+            this.rabbit = rabbit;
+            this.toxiproxy = toxiproxy;
+            this.client = client;
+            this.proxy = proxy;
+        }
+
+        public RabbitMQContainer rabbit() {
+            return rabbit;
+        }
+
+        public ToxiproxyContainer toxiproxy() {
+            return toxiproxy;
+        }
+
+        public ToxiproxyClient client() {
+            return client;
+        }
+
+        public Proxy proxy() {
+            return proxy;
+        }
 
         /** Fábrica que conecta direto no RabbitMQ, sem passar pelo Toxiproxy (inspeção dos testes). */
         public ConnectionFactory directFactory() {
@@ -102,7 +131,7 @@ public final class TestInfrastructure {
 
     private static String setting(String environmentVariable, String fallback) {
         String value = System.getenv(environmentVariable);
-        return value == null || value.isBlank() ? fallback : value;
+        return value == null || Texts.isBlank(value) ? fallback : value;
     }
 
     private static String randomSecret() {

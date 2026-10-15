@@ -32,12 +32,12 @@ metadata:
 
 | Id | Decisão | Destino |
 |---|---|---|
-| D1 | Java 21 como versão mínima suportada. Os módulos `mensageria-outbox` e `mensageria-inbox` não dependem de Spring Boot. | Convenção em `AGENTS.md` |
+| D1 | Java 21 como versão mínima suportada, exceto no `mensageria-outbox`, que tem Java 8 como piso. Os módulos `mensageria-outbox` e `mensageria-inbox` não dependem de Spring Boot. | Convenção em `AGENTS.md` |
 | D2 | Maven multi-módulo (`mensageria-outbox`, `mensageria-inbox`, pagamentos, extrato, reconciliação). | Convenção em `AGENTS.md` |
-| D3 | Spring Boot 3.x (compatível com Java 21) nas aplicações Pagamentos e Extrato; Pagamentos consome o `mensageria-outbox` e Extrato consome o `mensageria-inbox`, cada um por adaptador fino. | Domínios Pagamentos e Extrato; convenção em `AGENTS.md` |
+| D3 | Spring Boot 3.x (compatível com Java 21) nas aplicações Pagamentos e Extrato; Pagamentos consome o `mensageria-outbox` (Java 8 como piso, usado pelo adaptador de Pagamentos em Spring Boot 3.x) e Extrato consome o `mensageria-inbox`, cada um por adaptador fino. | Domínios Pagamentos e Extrato; convenção em `AGENTS.md` |
 | D4 | ADRs como forma de documentação complementar, incluindo a escolha entre as estratégias de relay (spec §8). | `technicalSkills`: `registro-de-adrs` |
 | D5 | O relay de Pagamentos usa SQL Server executado em Docker, porque as duas estratégias de relay dependem de recursos próprios do SQL Server (`UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion` com `min_active_rowversion()`), ausentes no H2. Onde esses recursos não são necessários (inbox de Extrato e Reconciliação), vale a restrição de H2 em arquivo. | `technicalSkills`: `ambiente-docker-sqlserver-rabbitmq`; domínios `mensageria-outbox`, `mensageria-inbox`, Pagamentos, Extrato e Reconciliação |
-| D6 | Ambiente de teste com Testcontainers (SQL Server, RabbitMQ) e Toxiproxy para injeção de falhas, com suíte repetível dos cenários A-F1 a A-F7. A compatibilidade com Java 21 deve ser confirmada na implementação. | `technicalSkills`: `testes-de-falha-resiliencia` |
+| D6 | Ambiente de teste com Testcontainers (SQL Server, RabbitMQ) e Toxiproxy para injeção de falhas, com suíte repetível dos cenários A-F1 a A-F7. A compatibilidade de Testcontainers e Micrometer é verificada pela suíte do `mensageria-outbox` nos JDKs 8, 11, 17, 21 e 25. | `technicalSkills`: `testes-de-falha-resiliencia` |
 | D7 | Observabilidade: logs estruturados com `messageId`, `correlationId`, `aggregateKey`; propagação de `correlationId` e `traceId` nos headers e logs; métricas em Micrometer (publicação no `mensageria-outbox`, consumo no `mensageria-inbox`). | Convenção em `AGENTS.md`; domínios `mensageria-outbox` e `mensageria-inbox` |
 | D8 | Ambas as estratégias de relay (claim e ponto de leitura) são implementadas atrás de uma única interface, para comparação. | Domínio `mensageria-outbox` |
 | D9 | A mensageria é dividida em dois módulos independentes: `mensageria-outbox` (produtor) e `mensageria-inbox` (consumidor). Cada módulo carrega a própria definição do envelope padrão, de modo que nenhum dependa do outro. | Domínios `mensageria-outbox` e `mensageria-inbox`; convenção em `AGENTS.md` (estrutura de módulos) |
@@ -59,7 +59,7 @@ Nenhum detectado. Evidência: ausência de `.specify/`, `openspec/` e de qualque
 
 | Lacuna | Pergunta | Decisão |
 |---|---|---|
-| g1 · Plataforma Java | Qual a versão mínima de Java a suportar? | Java 21 (D1). |
+| g1 · Plataforma Java | Qual a versão mínima de Java a suportar? | Java 21 (D1), exceto o `mensageria-outbox`, com Java 8 como piso e suíte verificada nos JDKs 8, 11, 17, 21 e 25 (compatibilidade de Testcontainers e Micrometer incluída). |
 | g2 · Build e módulos | Qual ferramenta de build para o projeto multi-módulo? | Maven multi-módulo (D2). |
 | g3 · Aplicações Pagamentos e Extrato | Qual framework nas aplicações? | Spring Boot, versão compatível com o Java escolhido (D3). |
 | g4 · Documentação complementar | Quais formas de documentação manter além das skills de negócio? | ADRs, incluindo a estratégia de relay (D4). |

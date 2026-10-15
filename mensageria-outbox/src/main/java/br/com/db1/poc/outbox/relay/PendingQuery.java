@@ -23,10 +23,17 @@ public interface PendingQuery {
         return (dataSource, strategy) -> {
             try (Connection connection = dataSource.getConnection()) {
                 connection.setAutoCommit(true);
-                OutboxDialect.PendingSummary summary = switch (strategy) {
-                    case CLAIM -> dialect.pendingUnsent(connection);
-                    case READ_POINT -> dialect.pendingAheadOfReadPoint(connection);
-                };
+                OutboxDialect.PendingSummary summary;
+                switch (strategy) {
+                    case CLAIM:
+                        summary = dialect.pendingUnsent(connection);
+                        break;
+                    case READ_POINT:
+                        summary = dialect.pendingAheadOfReadPoint(connection);
+                        break;
+                    default:
+                        throw new IllegalStateException("Estratégia não tratada: " + strategy);
+                }
                 return new PendingStats(summary.count(), Duration.ofMillis(summary.oldestAgeMillis()));
             }
         };

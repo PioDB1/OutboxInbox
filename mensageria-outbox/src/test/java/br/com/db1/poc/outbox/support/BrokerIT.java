@@ -36,7 +36,29 @@ public abstract class BrokerIT extends SqlServerIT {
     private final List<AutoCloseable> closeables = new ArrayList<>();
 
     /** Mensagem lida da fila de teste. */
-    public record Received(byte[] body, Map<String, Object> headers, AMQP.BasicProperties properties) {
+    public static final class Received {
+
+        private final byte[] body;
+        private final Map<String, Object> headers;
+        private final AMQP.BasicProperties properties;
+
+        public Received(byte[] body, Map<String, Object> headers, AMQP.BasicProperties properties) {
+            this.body = body;
+            this.headers = headers;
+            this.properties = properties;
+        }
+
+        public byte[] body() {
+            return body;
+        }
+
+        public Map<String, Object> headers() {
+            return headers;
+        }
+
+        public AMQP.BasicProperties properties() {
+            return properties;
+        }
 
         public String header(String name) {
             return String.valueOf(headers.get(name));

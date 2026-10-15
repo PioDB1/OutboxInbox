@@ -77,9 +77,13 @@ public final class OutboxRetention {
     }
 
     private int deleteBatch(Connection connection) throws SQLException {
-        return switch (strategy) {
-            case CLAIM -> dialect.deleteSentByTimestamp(connection, maxAgeMillis, batchSize);
-            case READ_POINT -> dialect.deleteBehindReadPoint(connection, maxAgeMillis, batchSize);
-        };
+        switch (strategy) {
+            case CLAIM:
+                return dialect.deleteSentByTimestamp(connection, maxAgeMillis, batchSize);
+            case READ_POINT:
+                return dialect.deleteBehindReadPoint(connection, maxAgeMillis, batchSize);
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
     }
 }

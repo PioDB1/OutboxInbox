@@ -32,18 +32,17 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
             "seq, rv, message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver, occurred_at,"
                     + " trace_id, payload";
 
-    private static final String INSERT = """
-            INSERT INTO outbox (message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver,
-                                occurred_at, trace_id, payload)
-            OUTPUT INSERTED.seq
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""";
+    private static final String INSERT =
+            "INSERT INTO outbox (message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver,\n"
+            + "                    occurred_at, trace_id, payload)\n"
+            + "OUTPUT INSERTED.seq\n"
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String CLAIM_PENDING = "SELECT TOP (?) " + COLUMNS
             + " FROM outbox WITH (UPDLOCK, READPAST, ROWLOCK) WHERE sent_at IS NULL ORDER BY seq";
 
-    private static final String PENDING_BETWEEN = """
-            SELECT TOP (1) 1 FROM outbox WITH (READUNCOMMITTED)
-            WHERE aggregate_key = ? AND seq > ? AND seq < ? AND sent_at IS NULL""";
+    private static final String PENDING_BETWEEN = "SELECT TOP (1) 1 FROM outbox WITH (READUNCOMMITTED)\n"
+            + "WHERE aggregate_key = ? AND seq > ? AND seq < ? AND sent_at IS NULL";
 
     private static final String MARK_SENT = "UPDATE outbox SET sent_at = SYSUTCDATETIME() WHERE seq = ?";
 
@@ -57,9 +56,9 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
             + " FROM outbox WITH (INDEX(UX_outbox_rv))"
             + " WHERE rv > CAST(? AS BINARY(8)) AND rv < CAST(? AS BINARY(8)) ORDER BY rv";
 
-    private static final String ADVANCE_READ_POINT = """
-            UPDATE outbox_read_point SET last_rv = CAST(? AS BINARY(8)), updated_at = SYSUTCDATETIME()
-            WHERE relay_name = ? AND last_rv < CAST(? AS BINARY(8))""";
+    private static final String ADVANCE_READ_POINT =
+            "UPDATE outbox_read_point SET last_rv = CAST(? AS BINARY(8)), updated_at = SYSUTCDATETIME()\n"
+            + "WHERE relay_name = ? AND last_rv < CAST(? AS BINARY(8))";
 
     private static final String READ_POINT_EXISTS = "SELECT 1 FROM outbox_read_point WHERE relay_name = ?";
 
@@ -68,39 +67,36 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
 
     // READPAST: a consulta de métricas não espera as linhas de transações abertas (inserções ainda não
     // confirmadas e linhas que a estratégia claim está marcando).
-    private static final String PENDING_UNSENT = """
-            SELECT COUNT_BIG(*), DATEDIFF_BIG(MILLISECOND, MIN(created_at), SYSUTCDATETIME())
-              FROM outbox WITH (READPAST)
-             WHERE sent_at IS NULL""";
+    private static final String PENDING_UNSENT =
+            "SELECT COUNT_BIG(*), DATEDIFF_BIG(MILLISECOND, MIN(created_at), SYSUTCDATETIME())\n"
+            + "  FROM outbox WITH (READPAST)\n"
+            + " WHERE sent_at IS NULL";
 
-    private static final String PENDING_AHEAD_OF_READ_POINT = """
-            SELECT COUNT_BIG(*), DATEDIFF_BIG(MILLISECOND, MIN(created_at), SYSUTCDATETIME())
-              FROM outbox WITH (READPAST)
-             WHERE rv > COALESCE((SELECT last_rv FROM outbox_read_point WHERE relay_name = ?), 0x0000000000000000)""";
+    private static final String PENDING_AHEAD_OF_READ_POINT =
+            "SELECT COUNT_BIG(*), DATEDIFF_BIG(MILLISECOND, MIN(created_at), SYSUTCDATETIME())\n"
+            + "  FROM outbox WITH (READPAST)\n"
+            + " WHERE rv > COALESCE((SELECT last_rv FROM outbox_read_point WHERE relay_name = ?), 0x0000000000000000)";
 
-    private static final String RENEW_LEASE = """
-            UPDATE outbox_lease
-               SET holder_id = ?, expires_at = DATEADD(MILLISECOND, ?, SYSUTCDATETIME())
-             WHERE lease_name = ? AND (holder_id = ? OR expires_at < SYSUTCDATETIME())""";
+    private static final String RENEW_LEASE = "UPDATE outbox_lease\n"
+            + "   SET holder_id = ?, expires_at = DATEADD(MILLISECOND, ?, SYSUTCDATETIME())\n"
+            + " WHERE lease_name = ? AND (holder_id = ? OR expires_at < SYSUTCDATETIME())";
 
-    private static final String INSERT_LEASE = """
-            INSERT INTO outbox_lease (lease_name, holder_id, expires_at)
-            SELECT ?, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME())
-             WHERE NOT EXISTS (SELECT 1 FROM outbox_lease WITH (UPDLOCK, HOLDLOCK) WHERE lease_name = ?)""";
+    private static final String INSERT_LEASE = "INSERT INTO outbox_lease (lease_name, holder_id, expires_at)\n"
+            + "SELECT ?, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME())\n"
+            + " WHERE NOT EXISTS (SELECT 1 FROM outbox_lease WITH (UPDLOCK, HOLDLOCK) WHERE lease_name = ?)";
 
-    private static final String RELEASE_LEASE = """
-            UPDATE outbox_lease SET expires_at = DATEADD(MILLISECOND, -1, SYSUTCDATETIME())
-             WHERE lease_name = ? AND holder_id = ?""";
+    private static final String RELEASE_LEASE =
+            "UPDATE outbox_lease SET expires_at = DATEADD(MILLISECOND, -1, SYSUTCDATETIME())\n"
+            + " WHERE lease_name = ? AND holder_id = ?";
 
-    private static final String DELETE_SENT = """
-            DELETE TOP (?) FROM outbox WITH (READPAST)
-             WHERE sent_at IS NOT NULL
-               AND sent_at < DATEADD(SECOND, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME()))""";
+    private static final String DELETE_SENT = "DELETE TOP (?) FROM outbox WITH (READPAST)\n"
+            + " WHERE sent_at IS NOT NULL\n"
+            + "   AND sent_at < DATEADD(SECOND, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME()))";
 
-    private static final String DELETE_BEHIND_READ_POINT = """
-            DELETE TOP (?) FROM outbox WITH (READPAST, INDEX(UX_outbox_rv))
-             WHERE rv <= (SELECT last_rv FROM outbox_read_point WHERE relay_name = ?)
-               AND created_at < DATEADD(SECOND, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME()))""";
+    private static final String DELETE_BEHIND_READ_POINT =
+            "DELETE TOP (?) FROM outbox WITH (READPAST, INDEX(UX_outbox_rv))\n"
+            + " WHERE rv <= (SELECT last_rv FROM outbox_read_point WHERE relay_name = ?)\n"
+            + "   AND created_at < DATEADD(SECOND, ?, DATEADD(MILLISECOND, ?, SYSUTCDATETIME()))";
 
     private static final byte[] ZERO_RV = new byte[8];
 

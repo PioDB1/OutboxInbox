@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.sql.DataSource;
 
 /**
@@ -119,7 +120,7 @@ final class InMemoryDialect implements OutboxDialect {
                 .sorted(Comparator.comparingLong(r -> r.seq))
                 .limit(limit)
                 .map(r -> new OutboxRow(r.seq, bytes(r.rv), r.envelope))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -155,7 +156,7 @@ final class InMemoryDialect implements OutboxDialect {
                 .sorted(Comparator.comparingLong(r -> r.rv))
                 .limit(limit)
                 .map(r -> new OutboxRow(r.seq, bytes(r.rv), r.envelope))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -165,12 +166,12 @@ final class InMemoryDialect implements OutboxDialect {
 
     @Override
     public synchronized PendingSummary pendingUnsent(Connection connection) {
-        return summarize(rows.stream().filter(r -> !r.sent && !r.open).toList());
+        return summarize(rows.stream().filter(r -> !r.sent && !r.open).collect(Collectors.toList()));
     }
 
     @Override
     public synchronized PendingSummary pendingAheadOfReadPoint(Connection connection) {
-        return summarize(rows.stream().filter(r -> r.rv > readPoint && !r.open).toList());
+        return summarize(rows.stream().filter(r -> r.rv > readPoint && !r.open).collect(Collectors.toList()));
     }
 
     private static PendingSummary summarize(List<Stored> pending) {

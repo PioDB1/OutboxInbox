@@ -28,9 +28,8 @@ public abstract class SqlServerIT {
             if (!schemaInstalled) {
                 OutboxSchemaInstaller.install(dataSource);
                 OutboxDb setup = new OutboxDb(dataSource);
-                setup.execute("""
-                        IF OBJECT_ID(N'negocio_teste', N'U') IS NULL
-                            CREATE TABLE negocio_teste (id INT IDENTITY(1,1) PRIMARY KEY, nome NVARCHAR(50) NOT NULL)""");
+                setup.execute("IF OBJECT_ID(N'negocio_teste', N'U') IS NULL\n"
+                        + "    CREATE TABLE negocio_teste (id INT IDENTITY(1,1) PRIMARY KEY, nome NVARCHAR(50) NOT NULL)");
                 schemaInstalled = true;
             }
         }

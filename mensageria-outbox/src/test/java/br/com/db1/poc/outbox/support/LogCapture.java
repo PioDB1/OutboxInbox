@@ -4,6 +4,8 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +25,7 @@ public final class LogCapture implements AutoCloseable {
     }
 
     public List<ILoggingEvent> events() {
-        return List.copyOf(appender.list);
+        return Collections.unmodifiableList(new ArrayList<>(appender.list));
     }
 
     @Override

@@ -12,9 +12,12 @@ import br.com.db1.poc.outbox.support.ScriptedPublisher;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -38,14 +41,18 @@ class RelayAlgorithmTest {
             properties.setProperty("outbox.relay." + extra[i], extra[i + 1]);
         }
         RelayConfig config = RelayConfig.fromProperties(properties);
-        return switch (strategy) {
-            case CLAIM -> new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, holderId);
-            case READ_POINT -> new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, holderId);
-        };
+        switch (strategy) {
+            case CLAIM:
+                return new ClaimRelay(config, dialect.dataSource(), dialect, publisher, meters, holderId);
+            case READ_POINT:
+                return new ReadPointRelay(config, dialect.dataSource(), dialect, publisher, meters, holderId);
+            default:
+                throw new IllegalStateException("Estratégia não tratada: " + strategy);
+        }
     }
 
     private static List<UUID> ids(ScriptedPublisher publisher) {
-        return publisher.delivered().stream().map(m -> m.messageId()).toList();
+        return publisher.delivered().stream().map(m -> m.messageId()).collect(Collectors.toList());
     }
 
     private static void runUntil(Relay relay, String description, java.util.function.BooleanSupplier condition) {
@@ -68,7 +75,7 @@ class RelayAlgorithmTest {
 
         assertEquals(3, relay(strategy, publisher, "r").runOnce());
 
-        assertEquals(List.of(a1.messageId(), b1.messageId(), a2.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(a1.messageId(), b1.messageId(), a2.messageId()), ids(publisher));
         if (strategy == RelayStrategyType.CLAIM) {
             assertEquals(0, dialect.pendingCount());
         } else {
@@ -88,12 +95,12 @@ class RelayAlgorithmTest {
 
         relay.runOnce();
         relay.runOnce();
-        assertEquals(List.of(), ids(publisher));
+        assertEquals(Collections.emptyList(), ids(publisher));
 
         dialect.commit(openRow);
         runUntil(relay, "duas linhas publicadas", () -> publisher.delivered().size() == 2);
 
-        assertEquals(List.of(open.messageId(), committed.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(open.messageId(), committed.messageId()), ids(publisher));
     }
 
     @ParameterizedTest
@@ -110,7 +117,7 @@ class RelayAlgorithmTest {
         dialect.commit(openRow);
         runUntil(relay, "duas linhas publicadas", () -> publisher.delivered().size() == 2);
 
-        assertTrue(ids(publisher).containsAll(List.of(fromOpen.messageId(), other.messageId())));
+        assertTrue(ids(publisher).containsAll(Arrays.asList(fromOpen.messageId(), other.messageId())));
     }
 
     @Test
@@ -123,7 +130,7 @@ class RelayAlgorithmTest {
 
         relay(RelayStrategyType.CLAIM, publisher, "r").runOnce();
 
-        assertEquals(List.of(other.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(other.messageId()), ids(publisher));
     }
 
     @Test
@@ -135,12 +142,12 @@ class RelayAlgorithmTest {
         ScriptedPublisher publisher = new ScriptedPublisher();
         Relay relay = relay(RelayStrategyType.CLAIM, publisher, "r");
         relay.runOnce();
-        assertEquals(List.of(), ids(publisher));
+        assertEquals(Collections.emptyList(), ids(publisher));
 
         dialect.rollback(openRow);
         relay.runOnce();
 
-        assertEquals(List.of(committed.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(committed.messageId()), ids(publisher));
     }
 
     @ParameterizedTest
@@ -156,12 +163,12 @@ class RelayAlgorithmTest {
         Relay relay = relay(strategy, publisher, "r");
 
         assertEquals(1, relay.runOnce());
-        assertEquals(List.of(y1.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(y1.messageId()), ids(publisher));
 
         publisher.stopFailing();
         runUntil(relay, "três linhas publicadas", () -> publisher.delivered().size() == 3);
 
-        assertEquals(List.of(y1.messageId(), x1.messageId(), x2.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(y1.messageId(), x1.messageId(), x2.messageId()), ids(publisher));
     }
 
     @ParameterizedTest
@@ -218,13 +225,13 @@ class RelayAlgorithmTest {
 
         relay.runOnce();
 
-        assertEquals(List.of(r1.messageId(), r3.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(r1.messageId(), r3.messageId()), ids(publisher));
         assertEquals(s1.rv, dialect.readPoint);
 
         publisher.stopFailing();
         runUntil(relay, "ponto no fim", () -> dialect.readPoint == s3.rv);
 
-        assertEquals(List.of(r1.messageId(), r3.messageId(), r2.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(r1.messageId(), r3.messageId(), r2.messageId()), ids(publisher));
     }
 
     @Test
@@ -240,7 +247,7 @@ class RelayAlgorithmTest {
 
         assertEquals(1, relay(RelayStrategyType.READ_POINT, publisher, "r2").runOnce());
 
-        assertEquals(List.of(third.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(third.messageId()), ids(publisher));
     }
 
     @ParameterizedTest

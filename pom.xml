@@ -17,6 +17,7 @@
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
+        <maven.build.jdk.min>21</maven.build.jdk.min>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.min.version>3.9</maven.min.version>
@@ -122,8 +123,8 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>[${maven.compiler.release},)</version>
-                                    <message>O build exige Java ${maven.compiler.release} ou superior.</message>
+                                    <version>[${maven.build.jdk.min},)</version>
+                                    <message>O build exige Java ${maven.build.jdk.min} ou superior.</message>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>[${maven.min.version},)</version>

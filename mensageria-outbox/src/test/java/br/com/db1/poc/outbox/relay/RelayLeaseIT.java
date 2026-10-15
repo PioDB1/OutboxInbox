@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.support.Await;
+import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
 import br.com.db1.poc.outbox.support.TestEnvelopes;
@@ -35,7 +36,7 @@ class RelayLeaseIT extends RelayIT {
 
     private List<Envelope> insert(int count) {
         List<Envelope> envelopes = new ArrayList<>();
-        try (var transaction = db.open()) {
+        try (OutboxDb.Transaction transaction = db.open()) {
             for (int i = 0; i < count; i++) {
                 Envelope envelope = TestEnvelopes.of("agg-" + (i % 10));
                 transaction.insert(envelope);
@@ -217,7 +218,7 @@ class RelayLeaseIT extends RelayIT {
 
     private static void awaitLatch(CountDownLatch latch) {
         try {
-            if (!latch.await(TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!latch.await(TIMEOUT.getSeconds(), java.util.concurrent.TimeUnit.SECONDS)) {
                 throw new AssertionError("A thread do relay não chegou ao ponto esperado");
             }
         } catch (InterruptedException e) {

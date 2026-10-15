@@ -4,6 +4,7 @@ import br.com.db1.poc.outbox.envelope.Envelope;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Acesso a banco da outbox, do lease e do ponto de leitura. Todo SQL do módulo vive nas implementações desta
@@ -11,13 +12,50 @@ import java.util.List;
  */
 public interface OutboxDialect {
 
-    /**
-     * Linhas pendentes vistas por uma consulta de leitura.
-     *
-     * @param count          quantidade de linhas pendentes
-     * @param oldestAgeMillis idade, no relógio do banco, da linha pendente mais antiga; zero sem pendentes
-     */
-    record PendingSummary(long count, long oldestAgeMillis) {
+    /** Linhas pendentes vistas por uma consulta de leitura. */
+    final class PendingSummary {
+
+        private final long count;
+        private final long oldestAgeMillis;
+
+        /**
+         * @param count           quantidade de linhas pendentes
+         * @param oldestAgeMillis idade, no relógio do banco, da linha pendente mais antiga; zero sem pendentes
+         */
+        public PendingSummary(long count, long oldestAgeMillis) {
+            this.count = count;
+            this.oldestAgeMillis = oldestAgeMillis;
+        }
+
+        public long count() {
+            return count;
+        }
+
+        public long oldestAgeMillis() {
+            return oldestAgeMillis;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof PendingSummary)) {
+                return false;
+            }
+            PendingSummary that = (PendingSummary) other;
+            return count == that.count && oldestAgeMillis == that.oldestAgeMillis;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(count, oldestAgeMillis);
+        }
+
+        @Override
+        public String toString() {
+            return "PendingSummary[count=" + count + ", oldestAgeMillis=" + oldestAgeMillis + "]";
+        }
     }
 
     /** Insere a linha da outbox e devolve o {@code seq} atribuído. */

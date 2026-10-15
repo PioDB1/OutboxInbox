@@ -1,54 +1,72 @@
 package br.com.db1.poc.outbox.relay;
 
+import br.com.db1.poc.outbox.internal.Texts;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Configuração do relay, lida das chaves {@code outbox.relay.*}.
- *
- * @param enabled           liga o relay na instância; só deve ser {@code true} em banco primário/ativo
- * @param strategy          estratégia de relay
- * @param exchange          exchange de publicação
- * @param batchSize         linhas por ciclo
- * @param pollInterval      espera entre ciclos sem trabalho
- * @param confirmTimeout    espera pelo confirm de cada mensagem
- * @param backoffInitial    primeiro intervalo de backoff de um {@code aggregateKey}
- * @param backoffMultiplier fator de crescimento do backoff
- * @param backoffMax        teto do backoff
- * @param leaseDuration     validade do lease a cada aquisição ou renovação
- * @param leaseRenewInterval intervalo entre renovações do lease
- * @param retentionMaxAge   idade mínima de uma linha enviada para ser removida
- * @param retentionInterval frequência da limpeza
- * @param retentionBatchSize linhas removidas por comando de limpeza
  */
-public record RelayConfig(
-        boolean enabled,
-        RelayStrategyType strategy,
-        String exchange,
-        int batchSize,
-        Duration pollInterval,
-        Duration confirmTimeout,
-        Duration backoffInitial,
-        double backoffMultiplier,
-        Duration backoffMax,
-        Duration leaseDuration,
-        Duration leaseRenewInterval,
-        Duration retentionMaxAge,
-        Duration retentionInterval,
-        int retentionBatchSize) {
+public final class RelayConfig {
 
     public static final String PREFIX = "outbox.relay.";
 
     private static final Pattern DURATION = Pattern.compile("(\\d+)\\s*(ms|s|m|h|d)");
 
-    public RelayConfig {
+    private final boolean enabled;
+    private final RelayStrategyType strategy;
+    private final String exchange;
+    private final int batchSize;
+    private final Duration pollInterval;
+    private final Duration confirmTimeout;
+    private final Duration backoffInitial;
+    private final double backoffMultiplier;
+    private final Duration backoffMax;
+    private final Duration leaseDuration;
+    private final Duration leaseRenewInterval;
+    private final Duration retentionMaxAge;
+    private final Duration retentionInterval;
+    private final int retentionBatchSize;
+
+    /**
+     * @param enabled           liga o relay na instância; só deve ser {@code true} em banco primário/ativo
+     * @param strategy          estratégia de relay
+     * @param exchange          exchange de publicação
+     * @param batchSize         linhas por ciclo
+     * @param pollInterval      espera entre ciclos sem trabalho
+     * @param confirmTimeout    espera pelo confirm de cada mensagem
+     * @param backoffInitial    primeiro intervalo de backoff de um {@code aggregateKey}
+     * @param backoffMultiplier fator de crescimento do backoff
+     * @param backoffMax        teto do backoff
+     * @param leaseDuration     validade do lease a cada aquisição ou renovação
+     * @param leaseRenewInterval intervalo entre renovações do lease
+     * @param retentionMaxAge   idade mínima de uma linha enviada para ser removida
+     * @param retentionInterval frequência da limpeza
+     * @param retentionBatchSize linhas removidas por comando de limpeza
+     */
+    public RelayConfig(
+            boolean enabled,
+            RelayStrategyType strategy,
+            String exchange,
+            int batchSize,
+            Duration pollInterval,
+            Duration confirmTimeout,
+            Duration backoffInitial,
+            double backoffMultiplier,
+            Duration backoffMax,
+            Duration leaseDuration,
+            Duration leaseRenewInterval,
+            Duration retentionMaxAge,
+            Duration retentionInterval,
+            int retentionBatchSize) {
         if (strategy == null) {
             throw new IllegalArgumentException(PREFIX + "strategy é obrigatória; valores aceitos: "
                     + RelayStrategyType.acceptedValues());
         }
-        if (exchange == null || exchange.isBlank()) {
+        if (exchange == null || Texts.isBlank(exchange)) {
             throw new IllegalArgumentException(PREFIX + "exchange não pode ser vazia");
         }
         requirePositive(batchSize, "batch-size");
@@ -70,6 +88,127 @@ public record RelayConfig(
         if (leaseRenewInterval.compareTo(leaseDuration) >= 0) {
             throw new IllegalArgumentException(PREFIX + "lease.renew-interval deve ser menor que lease.duration");
         }
+        this.enabled = enabled;
+        this.strategy = strategy;
+        this.exchange = exchange;
+        this.batchSize = batchSize;
+        this.pollInterval = pollInterval;
+        this.confirmTimeout = confirmTimeout;
+        this.backoffInitial = backoffInitial;
+        this.backoffMultiplier = backoffMultiplier;
+        this.backoffMax = backoffMax;
+        this.leaseDuration = leaseDuration;
+        this.leaseRenewInterval = leaseRenewInterval;
+        this.retentionMaxAge = retentionMaxAge;
+        this.retentionInterval = retentionInterval;
+        this.retentionBatchSize = retentionBatchSize;
+    }
+
+    public boolean enabled() {
+        return enabled;
+    }
+
+    public RelayStrategyType strategy() {
+        return strategy;
+    }
+
+    public String exchange() {
+        return exchange;
+    }
+
+    public int batchSize() {
+        return batchSize;
+    }
+
+    public Duration pollInterval() {
+        return pollInterval;
+    }
+
+    public Duration confirmTimeout() {
+        return confirmTimeout;
+    }
+
+    public Duration backoffInitial() {
+        return backoffInitial;
+    }
+
+    public double backoffMultiplier() {
+        return backoffMultiplier;
+    }
+
+    public Duration backoffMax() {
+        return backoffMax;
+    }
+
+    public Duration leaseDuration() {
+        return leaseDuration;
+    }
+
+    public Duration leaseRenewInterval() {
+        return leaseRenewInterval;
+    }
+
+    public Duration retentionMaxAge() {
+        return retentionMaxAge;
+    }
+
+    public Duration retentionInterval() {
+        return retentionInterval;
+    }
+
+    public int retentionBatchSize() {
+        return retentionBatchSize;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof RelayConfig)) {
+            return false;
+        }
+        RelayConfig that = (RelayConfig) other;
+        return enabled == that.enabled
+                && Objects.equals(strategy, that.strategy)
+                && Objects.equals(exchange, that.exchange)
+                && batchSize == that.batchSize
+                && Objects.equals(pollInterval, that.pollInterval)
+                && Objects.equals(confirmTimeout, that.confirmTimeout)
+                && Objects.equals(backoffInitial, that.backoffInitial)
+                && Double.compare(backoffMultiplier, that.backoffMultiplier) == 0
+                && Objects.equals(backoffMax, that.backoffMax)
+                && Objects.equals(leaseDuration, that.leaseDuration)
+                && Objects.equals(leaseRenewInterval, that.leaseRenewInterval)
+                && Objects.equals(retentionMaxAge, that.retentionMaxAge)
+                && Objects.equals(retentionInterval, that.retentionInterval)
+                && retentionBatchSize == that.retentionBatchSize;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(enabled, strategy, exchange, batchSize, pollInterval, confirmTimeout, backoffInitial,
+                backoffMultiplier, backoffMax, leaseDuration, leaseRenewInterval, retentionMaxAge,
+                retentionInterval, retentionBatchSize);
+    }
+
+    @Override
+    public String toString() {
+        return "RelayConfig[" + "enabled=" + enabled
+                + ", strategy=" + strategy
+                + ", exchange=" + exchange
+                + ", batchSize=" + batchSize
+                + ", pollInterval=" + pollInterval
+                + ", confirmTimeout=" + confirmTimeout
+                + ", backoffInitial=" + backoffInitial
+                + ", backoffMultiplier=" + backoffMultiplier
+                + ", backoffMax=" + backoffMax
+                + ", leaseDuration=" + leaseDuration
+                + ", leaseRenewInterval=" + leaseRenewInterval
+                + ", retentionMaxAge=" + retentionMaxAge
+                + ", retentionInterval=" + retentionInterval
+                + ", retentionBatchSize=" + retentionBatchSize
+                + "]";
     }
 
     /**
@@ -103,7 +242,7 @@ public record RelayConfig(
 
     private static String text(Properties properties, String key, String defaultValue) {
         String value = properties.getProperty(PREFIX + key);
-        return value == null || value.isBlank() ? defaultValue : value.strip();
+        return value == null || Texts.isBlank(value) ? defaultValue : Texts.strip(value);
     }
 
     private static int integer(Properties properties, String key, int defaultValue) {
@@ -135,13 +274,18 @@ public record RelayConfig(
         Matcher matcher = DURATION.matcher(value);
         if (matcher.matches()) {
             long amount = Long.parseLong(matcher.group(1));
-            return switch (matcher.group(2)) {
-                case "ms" -> Duration.ofMillis(amount);
-                case "s" -> Duration.ofSeconds(amount);
-                case "m" -> Duration.ofMinutes(amount);
-                case "h" -> Duration.ofHours(amount);
-                default -> Duration.ofDays(amount);
-            };
+            switch (matcher.group(2)) {
+                case "ms":
+                    return Duration.ofMillis(amount);
+                case "s":
+                    return Duration.ofSeconds(amount);
+                case "m":
+                    return Duration.ofMinutes(amount);
+                case "h":
+                    return Duration.ofHours(amount);
+                default:
+                    return Duration.ofDays(amount);
+            }
         }
         try {
             return Duration.parse(value);

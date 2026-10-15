@@ -74,7 +74,7 @@ docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 
 
 ### Testes de integração (Testcontainers)
 
-- Dependências em escopo de teste: JUnit 5, `org.testcontainers:mssqlserver`, `org.testcontainers:rabbitmq` e `org.testcontainers:toxiproxy`. A compatibilidade das versões escolhidas com Java 21 deve ser confirmada na implementação (decisão D6).
+- Dependências em escopo de teste: JUnit 5, `org.testcontainers:mssqlserver`, `org.testcontainers:rabbitmq` e `org.testcontainers:toxiproxy`. A compatibilidade das versões escolhidas é verificada pelo módulo `mensageria-outbox`, cuja suíte executa nos JDKs 8, 11, 17, 21 e 25 (decisão D6).
 - Use as mesmas versões de imagem do `compose.yaml` para que o comportamento local e o dos testes coincidam.
 - Contêineres de um mesmo conjunto de testes compartilham uma `Network` para que o Toxiproxy alcance o RabbitMQ pelo alias de rede.
 - Credenciais dos contêineres de teste são descartáveis, geradas ou definidas no código de teste para uso efêmero; não reutilize nos testes os valores do `.env` e não copie os de teste para o `compose.yaml`.

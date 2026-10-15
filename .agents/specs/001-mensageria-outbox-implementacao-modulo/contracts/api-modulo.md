@@ -4,7 +4,7 @@ Superfície pública usada pelo hospedeiro (Pagamentos). Pacote base `br.com.db1
 
 ## `envelope.Envelope`
 
-Record imutável: `UUID messageId`, `UUID correlationId`, `String idempotencyKey`, `String aggregateKey`, `String type`, `short schemaVersion`, `Instant occurredAt`, `byte[] payload`, `String traceId`. O construtor rejeita (`IllegalArgumentException`) campo nulo, texto vazio e texto acima do tamanho da coluna correspondente (`idempotencyKey` 200, `aggregateKey` 100, `type` 100, `traceId` 64). `Envelope.novo(...)` gera `messageId` aleatório (UUID v4) quando a aplicação não o informa.
+Classe final imutável, com um acessor de mesmo nome por campo: `UUID messageId`, `UUID correlationId`, `String idempotencyKey`, `String aggregateKey`, `String type`, `short schemaVersion`, `Instant occurredAt`, `byte[] payload`, `String traceId`. O construtor rejeita (`IllegalArgumentException`) campo nulo, texto vazio e texto acima do tamanho da coluna correspondente (`idempotencyKey` 200, `aggregateKey` 100, `type` 100, `traceId` 64). `Envelope.novo(...)` gera `messageId` aleatório (UUID v4) quando a aplicação não o informa.
 
 ## `write.OutboxWriter`
 
@@ -65,7 +65,11 @@ public final class RabbitTopology {
 public interface PendingQuery {
     PendingStats pending(DataSource dataSource, RelayStrategyType strategy) throws SQLException;
 }
-public record PendingStats(long count, Duration oldestAge) {}
+public final class PendingStats {
+    public PendingStats(long count, Duration oldestAge);
+    public long count();
+    public Duration oldestAge();
+}
 ```
 
 Fonte de `outbox.pending` e `outbox.lag.seconds`, e interface que o reconciliador usa para verificar que nenhuma linha fica pendente com o broker disponível.

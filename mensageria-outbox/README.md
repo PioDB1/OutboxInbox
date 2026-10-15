@@ -2,7 +2,7 @@
 
 Lado produtor da entrega atômica de mensagens do padrão outbox/inbox: envelope padrão, inserção na outbox na transação local da aplicação, relay com duas estratégias atrás de uma única interface, lease de relay único, publicação no RabbitMQ com publisher confirms, retry com backoff, retenção da outbox e métricas de publicação.
 
-É uma biblioteca Java 21 sem Spring Boot nem executável próprio. A aplicação hospedeira fornece o `DataSource` (SQL Server), o `MessagePublisher` e o `MeterRegistry`, e controla o ciclo de vida do relay. Contexto e decisões: `.agents/specs/001-mensageria-outbox-implementacao-modulo/` e a skill `.agents/skills/mensageria-outbox/SKILL.md`.
+É uma biblioteca com piso Java 8 (bytecode 52 e API do Java 8), que executa do JDK 8 ao JDK 25, sem Spring Boot nem executável próprio. A aplicação hospedeira fornece o `DataSource` (SQL Server), o `MessagePublisher` e o `MeterRegistry`, e controla o ciclo de vida do relay. Contexto e decisões: `.agents/specs/001-mensageria-outbox-implementacao-modulo/` e a skill `.agents/skills/mensageria-outbox/SKILL.md`.
 
 ## Uso pelo hospedeiro
 
@@ -84,18 +84,22 @@ Cada tentativa de publicação roda com as chaves de MDC `messageId`, `correlati
 
 | Componente | Versão |
 |---|---|
-| Java | 21 |
+| Java (piso do módulo) | 8 (`--release 8`) |
+| JDKs da matriz de verificação | 8, 11, 17, 21 e 25 |
+| JDK do build | 21 |
 | Maven | 3.9 ou superior |
 | `com.rabbitmq:amqp-client` | 5.37.0 |
-| `com.microsoft.sqlserver:mssql-jdbc` | 12.10.2.jre11 (runtime) |
+| `com.microsoft.sqlserver:mssql-jdbc` | 13.4.0.jre8 (runtime) |
 | `io.micrometer:micrometer-core` | 1.17.1 |
 | `org.slf4j:slf4j-api` | 2.0.20 |
-| JUnit | 5.14.4 |
+| JUnit (teste) | 5.14.4 |
 | Testcontainers | 2.0.5 |
-| Logback (teste) | 1.5.38 |
+| Logback (teste) | 1.3.16 |
 | SQL Server | `mcr.microsoft.com/mssql/server:2019-CU32-ubuntu-20.04` |
 | RabbitMQ | `rabbitmq:4.3.6-management` |
 | Toxiproxy | `ghcr.io/shopify/toxiproxy:2.10.0` |
+
+A aplicação hospedeira escolhe o driver SQL Server do próprio classpath; no JDK 8 ela precisa da variante `jre8`, porque a `jre11` tem bytecode Java 11.
 
 As imagens do `compose.yaml` na raiz e as da classe de teste `Images` são as mesmas; `ComposeImagesTest` confere a igualdade.
 
@@ -110,3 +114,17 @@ mvn clean verify                # a partir da raiz: testes *Test (surefire) e *I
 Os testes `*IT` sobem os próprios contêineres com Testcontainers, com credenciais efêmeras (ou as variáveis `MSSQL_SA_PASSWORD`, `RABBITMQ_DEFAULT_USER` e `RABBITMQ_DEFAULT_PASS`, quando definidas), e exigem Docker em execução; sem Docker eles são ignorados. O failsafe roda com `-Xmx256m -XX:MaxDirectMemorySize=64m`, os limites sob os quais `RelayMemoryIT` verifica que o relay não cresce em memória com o volume processado.
 
 O Toxiproxy do `compose.yaml` expõe a API de controle em `TOXIPROXY_API_PORT` e o proxy `rabbitmq` em `TOXIPROXY_RABBITMQ_PORT`; a aplicação aponta para essa porta para sofrer os toxics.
+
+### Matriz de JDKs
+
+O build exige JDK 21 (enforcer da raiz); o compilador usa `--release 8` e o artefato tem bytecode 52. Cada JDK da matriz (8, 11, 17, 21 e 25) executa a suíte do módulo com um ciclo `verify`, a partir da raiz, informando o `java` do JDK em `-Djvm`:
+
+```
+mvn -pl mensageria-outbox verify -Djvm=<JDK_HOME>/bin/java
+```
+
+- O Maven e o compilador seguem no JDK 21; `-Djvm` troca só a JVM dos forks do surefire (`*Test`) e do failsafe (`*IT`). A propriedade `java.version` dos relatórios XML de `target/surefire-reports` e `target/failsafe-reports` registra o JDK que executou os testes.
+- Os `*Test` rodam sem Docker. Os `*IT` exigem Docker em execução e são ignorados sem ele; uma execução sem Docker não verifica o relay contra SQL Server e RabbitMQ.
+- Com `mvn -pl mensageria-outbox test -Djvm=<JDK_HOME>/bin/java` só os `*Test` executam.
+
+Barreiras contra a volta de recursos posteriores ao Java 8: a compilação com `--release 8` recusa sintaxe e API novas; a regra `enforceBytecodeVersion` (execução `enforce-bytecode`, fase `validate`) recusa dependência com bytecode acima do Java 8 e cita o artefato; `BytecodeLevelTest` confere a versão principal 52 de todo `.class` de `target/classes` e `target/test-classes`; `PackageBoundaryTest` recusa imports `sun.*`, `com.sun.*` e `jdk.internal.*` e chamadas a `setAccessible` em `src/main`.

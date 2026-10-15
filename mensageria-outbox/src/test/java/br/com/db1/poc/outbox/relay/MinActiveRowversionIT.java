@@ -3,13 +3,16 @@ package br.com.db1.poc.outbox.relay;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import br.com.db1.poc.outbox.support.Images;
 import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.SqlServerIT;
 import br.com.db1.poc.outbox.support.TestEnvelopes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,7 +25,7 @@ import org.junit.jupiter.api.Test;
  */
 class MinActiveRowversionIT extends SqlServerIT {
 
-    private static final Path OBSERVATIONS = Path.of("target", "min-active-rowversion-observations.txt");
+    private static final Path OBSERVATIONS = Paths.get("target", "min-active-rowversion-observations.txt");
 
     @Test
     void semanticaDeMinActiveRowversion() throws SQLException, IOException {
@@ -43,17 +46,15 @@ class MinActiveRowversionIT extends SqlServerIT {
         afterCommitMinActive = minActive();
         assertTrue(afterCommitMinActive > insertedRv, "depois do commit o valor avança acima do rv inserido");
 
-        String report = """
-                imagem=%s
-                @@DBTS sem transações abertas=%d
-                MIN_ACTIVE_ROWVERSION() sem transações abertas=%d
-                rv da linha inserida=%d
-                MIN_ACTIVE_ROWVERSION() com a transação aberta=%d
-                MIN_ACTIVE_ROWVERSION() depois do commit=%d
-                """.formatted(br.com.db1.poc.outbox.support.Images.SQL_SERVER, idleDbts, idleMinActive, insertedRv,
-                openMinActive, afterCommitMinActive);
+        String report = String.format("imagem=%s\n"
+                + "@@DBTS sem transações abertas=%d\n"
+                + "MIN_ACTIVE_ROWVERSION() sem transações abertas=%d\n"
+                + "rv da linha inserida=%d\n"
+                + "MIN_ACTIVE_ROWVERSION() com a transação aberta=%d\n"
+                + "MIN_ACTIVE_ROWVERSION() depois do commit=%d\n",
+                Images.SQL_SERVER, idleDbts, idleMinActive, insertedRv, openMinActive, afterCommitMinActive);
         Files.createDirectories(OBSERVATIONS.getParent());
-        Files.writeString(OBSERVATIONS, report);
+        Files.write(OBSERVATIONS, report.getBytes(StandardCharsets.UTF_8));
         System.out.println(report);
     }
 

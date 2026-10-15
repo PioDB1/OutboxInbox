@@ -204,7 +204,7 @@ As dependências técnicas e as precondições de ambiente do domínio estão em
 ## Pontos em aberto
 
 - Se o código da PoC é descartável ou evolui para o starter interno é uma pergunta sem decisão; não bloqueia o domínio, e o isolamento do módulo (sem framework de aplicação, broker por interface) o mantém reaproveitável.
-- A confirmação da semântica de `min_active_rowversion()` (R17) e a compatibilidade de Micrometer e Testcontainers com a versão mínima de plataforma devem ser verificadas na implementação.
+- A confirmação da semântica de `min_active_rowversion()` (R17) deve ser verificada na implementação. A compatibilidade de Micrometer e Testcontainers com a plataforma do módulo (Java 8 como piso) é verificada pela suíte do módulo nos JDKs 8, 11, 17, 21 e 25.
 
 ## Manutenção
 

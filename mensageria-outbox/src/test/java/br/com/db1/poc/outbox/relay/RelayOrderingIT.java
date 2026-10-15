@@ -10,8 +10,11 @@ import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
 import br.com.db1.poc.outbox.support.TestEnvelopes;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -20,11 +23,11 @@ import org.junit.jupiter.params.provider.EnumSource;
 class RelayOrderingIT extends RelayIT {
 
     private static List<UUID> ids(List<Received> received) {
-        return received.stream().map(r -> UUID.fromString(r.header("messageId"))).toList();
+        return received.stream().map(r -> UUID.fromString(r.header("messageId"))).collect(Collectors.toList());
     }
 
     private static List<UUID> ids(ScriptedPublisher publisher) {
-        return publisher.delivered().stream().map(m -> m.messageId()).toList();
+        return publisher.delivered().stream().map(m -> m.messageId()).collect(Collectors.toList());
     }
 
     /** TC-18: duas mensagens do mesmo {@code aggregateKey} saem na ordem em que ocorreram. */
@@ -39,7 +42,7 @@ class RelayOrderingIT extends RelayIT {
 
         runUntil(relay, "duas linhas enviadas", () -> db.pendingCount(strategy) == 0);
 
-        assertEquals(List.of(older.messageId(), newer.messageId()), ids(awaitMessages(2, Duration.ofSeconds(10))));
+        assertEquals(Arrays.asList(older.messageId(), newer.messageId()), ids(awaitMessages(2, Duration.ofSeconds(10))));
     }
 
     /** TC-19: a falha de uma chave retém as posteriores da mesma chave; as demais chaves seguem. */
@@ -57,14 +60,14 @@ class RelayOrderingIT extends RelayIT {
 
         relay.runOnce();
 
-        assertEquals(List.of(y1.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(y1.messageId()), ids(publisher));
         assertFalse(db.isSent(strategy, x1.messageId()));
         assertFalse(db.isSent(strategy, x2.messageId()));
 
         publisher.stopFailing();
         runUntil(relay, "linhas de X enviadas", () -> publisher.delivered().size() == 3);
 
-        assertEquals(List.of(y1.messageId(), x1.messageId(), x2.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(y1.messageId(), x1.messageId(), x2.messageId()), ids(publisher));
     }
 
     /** TC-20: commit fora da ordem de {@code seq} em chaves diferentes não pula a linha da transação anterior. */
@@ -87,7 +90,7 @@ class RelayOrderingIT extends RelayIT {
         runUntil(relay, "duas linhas enviadas", () -> db.pendingCount(strategy) == 0);
 
         assertEquals(2, publisher.delivered().size());
-        assertTrue(ids(publisher).containsAll(List.of(fromT1.messageId(), fromT2.messageId())));
+        assertTrue(ids(publisher).containsAll(Arrays.asList(fromT1.messageId(), fromT2.messageId())));
     }
 
     /** TC-21: commit fora da ordem de {@code seq} no mesmo {@code aggregateKey} preserva a ordem. */
@@ -103,12 +106,12 @@ class RelayOrderingIT extends RelayIT {
             db.insert(fromT2);
             relay.runOnce();
             relay.runOnce();
-            assertEquals(List.of(), readAvailable(), "nada de X é publicado com T1 aberta");
+            assertEquals(Collections.emptyList(), readAvailable(), "nada de X é publicado com T1 aberta");
             t1.commit();
         }
         runUntil(relay, "duas linhas enviadas", () -> db.pendingCount(strategy) == 0);
 
-        assertEquals(List.of(fromT1.messageId(), fromT2.messageId()), ids(awaitMessages(2, Duration.ofSeconds(10))));
+        assertEquals(Arrays.asList(fromT1.messageId(), fromT2.messageId()), ids(awaitMessages(2, Duration.ofSeconds(10))));
     }
 
     /** TC-22: a transação revertida deixa de bloquear o {@code aggregateKey} (claim). */
@@ -124,11 +127,11 @@ class RelayOrderingIT extends RelayIT {
             t1.insert(fromT1);
             db.insert(fromT2);
             relay.runOnce();
-            assertEquals(List.of(), ids(publisher));
+            assertEquals(Collections.emptyList(), ids(publisher));
             t1.rollback();
         }
         runUntil(relay, "linha de T2 enviada", () -> db.isSent(strategy, fromT2.messageId()));
 
-        assertEquals(List.of(fromT2.messageId()), ids(publisher));
+        assertEquals(Arrays.asList(fromT2.messageId()), ids(publisher));
     }
 }

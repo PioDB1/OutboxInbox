@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -99,7 +100,7 @@ class RelayPublicationIT extends RelayIT {
 
         assertFalse(db.isSent(strategy, envelope.messageId()));
         assertEquals(1, db.pendingCount(strategy));
-        assertEquals(List.of(), readAvailable());
+        assertEquals(Collections.emptyList(), readAvailable());
     }
 
     /** TC-12: mensagem devolvida por falta de fila ligada não é dada como enviada. */

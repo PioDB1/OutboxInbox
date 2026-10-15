@@ -16,7 +16,7 @@ metadata:
 
 A PoC responde se produtor e consumidor, cada um com seu banco, mantêm consistência eventual correta sob falhas, sem transação distribuída. A suíte de falhas prova isso: cada cenário A-F1 a A-F7 injeta uma falha, espera o sistema convergir sem intervenção manual e então entrega o veredito ao **reconciliador**, que verifica as invariantes A1 a A4 a partir dos dois bancos. O critério de conclusão da PoC é: invariantes verdadeiras ao final de todas as falhas injetadas (spec §13).
 
-Ambiente (decisão D6): Testcontainers (SQL Server para o banco de Pagamentos e a outbox, RabbitMQ com filas quorum) e Toxiproxy para falhas de rede. A compatibilidade das versões de Testcontainers, Toxiproxy e Micrometer com Java 21 deve ser confirmada na implementação. O Extrato usa H2 em arquivo temporário.
+Ambiente (decisão D6): Testcontainers (SQL Server para o banco de Pagamentos e a outbox, RabbitMQ com filas quorum) e Toxiproxy para falhas de rede. A compatibilidade das versões de Testcontainers, Toxiproxy e Micrometer é verificada pela suíte do módulo `mensageria-outbox` nos JDKs 8, 11, 17, 21 e 25. O Extrato usa H2 em arquivo temporário.
 
 ## Como aplicar
 

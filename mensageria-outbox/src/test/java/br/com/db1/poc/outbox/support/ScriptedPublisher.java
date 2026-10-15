@@ -3,10 +3,13 @@ package br.com.db1.poc.outbox.support;
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishException;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Publicador de teste: registra as tentativas, falha onde o teste manda e aceita ganchos antes e depois da
@@ -15,7 +18,29 @@ import java.util.function.Predicate;
 public final class ScriptedPublisher implements MessagePublisher {
 
     /** Tentativa de publicação, com o instante em {@link System#nanoTime()}. */
-    public record Attempt(PublishableMessage message, long nanoTime, boolean succeeded) {
+    public static final class Attempt {
+
+        private final PublishableMessage message;
+        private final long nanoTime;
+        private final boolean succeeded;
+
+        public Attempt(PublishableMessage message, long nanoTime, boolean succeeded) {
+            this.message = message;
+            this.nanoTime = nanoTime;
+            this.succeeded = succeeded;
+        }
+
+        public PublishableMessage message() {
+            return message;
+        }
+
+        public long nanoTime() {
+            return nanoTime;
+        }
+
+        public boolean succeeded() {
+            return succeeded;
+        }
     }
 
     private final MessagePublisher delegate;
@@ -87,15 +112,15 @@ public final class ScriptedPublisher implements MessagePublisher {
     }
 
     public List<Attempt> attempts() {
-        return List.copyOf(attempts);
+        return Collections.unmodifiableList(new ArrayList<>(attempts));
     }
 
     public List<Attempt> attemptsOf(java.util.UUID messageId) {
-        return attempts.stream().filter(a -> a.message().messageId().equals(messageId)).toList();
+        return attempts.stream().filter(a -> a.message().messageId().equals(messageId)).collect(Collectors.toList());
     }
 
     public List<PublishableMessage> delivered() {
-        return List.copyOf(delivered);
+        return Collections.unmodifiableList(new ArrayList<>(delivered));
     }
 
     @Override

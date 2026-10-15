@@ -3,6 +3,7 @@ package br.com.db1.poc.outbox.rabbit;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -13,7 +14,8 @@ import java.util.Map;
  */
 public final class RabbitTopology {
 
-    private static final Map<String, Object> QUORUM_ARGUMENTS = Map.of("x-queue-type", "quorum");
+    private static final Map<String, Object> QUORUM_ARGUMENTS =
+            Collections.<String, Object>singletonMap("x-queue-type", "quorum");
 
     private RabbitTopology() {
     }
