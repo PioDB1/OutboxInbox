@@ -1,0 +1,25 @@
+@startuml
+title Padrão Inbox Sincrono Com Controlador de Idempotência
+
+queue Fila as fila
+participant Listener as listener
+database "Base principal" as DB
+
+fila --> listener : Recebe dados da fila
+activate listener
+    listener -> DB : Consulta idempotencia da mensagem
+    activate DB
+        alt Mensagem já processada
+            DB --> listener: Retorna idempotencia da mensagem
+            listener --> fila: ACK da mensagem
+        else Mensagem não processada
+            listener -> listener: Processa a mensagem
+            listener -> DB : Salvar dados da transação
+            activate DB
+                listener -> DB : Gravar idempotencia da mensagem
+                listener --> fila: ACK da mensagem
+            deactivate DB
+        end
+deactivate listener
+
+@enduml

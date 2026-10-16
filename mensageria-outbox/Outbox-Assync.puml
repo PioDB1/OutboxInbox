@@ -2,8 +2,7 @@
 title Padrão Outbox Assíncrono At-Least-Once
 participant App
 database "Base principal" as DB
-
-queue Fila as fila
+queue "Fila" as fila
 
 activate App
     App -> DB : Salvar dados principais da transação
@@ -11,27 +10,38 @@ activate App
         App -> DB : Enviar dados de outbox
         DB --> App : Confirmação de gravação
     deactivate DB
-    create participant "Outbox Service" as OutboxAsync
+    create control "Outbox Thread" as OutboxAsync
     App -->> OutboxAsync : Dispara envio de mensagem para fila
 deactivate App
+group x
+activate OutboxAsync
 loop Confirmação de recebimento
-        OutboxAsync -> fila : Enviar dados para fila
-        activate OutboxAsync
-            fila --> OutboxAsync : Confirmação de recebimento
-            OutboxAsync -> DB : Atualizar status de envio
-        destroy OutboxAsync
+    OutboxAsync -> fila : Enviar dados para fila
+    break Numero de tentativas excedido
+        OutboxAsync -> DB : Atualizar status de envio como falha
+        create participant "Monitoramento" as monitor
+        OutboxAsync -> monitor : Notificar falha de envio
+    end
+    fila --> OutboxAsync : Confirmação de recebimento
+end
+OutboxAsync -> DB : Atualizar status de envio
+destroy OutboxAsync
 end
 
-alt Inicialização da aplicação
-App -> DB: Consulta outbox pendentes
-DB --> App: Retorna dados pendentes
-create participant "Outbox Service" as OutboxAsync1
-App-->> OutboxAsync1: Enfileirar dados pendentes
-loop Confirmação de recebimento
-activate OutboxAsync1
-OutboxAsync1 -> fila : Enviar dados para fila
-fila --> OutboxAsync1 : Confirmação de recebimento
-deactivate OutboxAsync1
-end
+group Inicialização da aplicação
+    App -> DB: Consulta outbox pendentes
+    DB --> App: Retorna dados pendentes
+    create control "Outbox Thread" as OutboxAsync1
+    App-->> OutboxAsync1: Enfileirar dados pendentes
+    ref x
+    end
+    loop Confirmação de recebimento
+        OutboxAsync1 -> fila : Enviar dados para fila
+        activate OutboxAsync1
+            fila --> OutboxAsync1 : Confirmação de recebimento
+    end
+    OutboxAsync1 -> DB : Atualizar status de envio
+    deactivate OutboxAsync1
+    destroy OutboxAsync1
 end
 @enduml
