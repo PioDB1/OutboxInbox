@@ -13,6 +13,8 @@
 
     <modules>
         <module>mensageria-outbox</module>
+        <module>mensageria-outbox-spring-boot3</module>
+        <module>mensageria-outbox-spring-boot4</module>
     </modules>
 
     <properties>

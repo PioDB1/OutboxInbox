@@ -1,6 +1,6 @@
 ---
 name: pagamentos
-description: Esta é a documentação autoritativa do domínio Pagamentos, fonte da verdade sobre a solicitação e o registro de pagamento e a publicação do evento PagamentoRecebido. Use ao implementar, alterar ou revisar o endpoint POST /pagamentos, a tabela pagamento, a tabela movimento e a MovimentoEntity, o endpoint POST /movimentos e seu parâmetro forcarFalha, o status RECEBIDO, cooperadoId, valor, o contrato PagamentoRecebido v1, o envelope da mensagem, a gravação atômica de pagamento e outbox e a publicação at-least-once no RabbitMQ.
+description: Esta é a documentação autoritativa do domínio Pagamentos, fonte da verdade sobre a solicitação e o registro de pagamento, a inclusão de movimento e a publicação dos eventos PagamentoRecebido e MovimentoRegistrado. Use ao implementar, alterar ou revisar o endpoint POST /pagamentos, a tabela pagamento, a tabela movimento e a MovimentoEntity, o endpoint POST /movimentos e seu parâmetro forcarFalha, o status RECEBIDO, cooperadoId, valor, os contratos PagamentoRecebido v1 e MovimentoRegistrado v1, a fila movimentos.movimento-registrado, o envelope da mensagem, a gravação atômica de pagamento e outbox e a publicação at-least-once no RabbitMQ.
 metadata:
   author: clovis-cli
   type: domain-skill
@@ -15,6 +15,8 @@ metadata:
 ## Visão geral do domínio
 
 Pagamentos recebe a solicitação de pagamento de um cooperado, registra o pagamento e publica o fato `PagamentoRecebido` para outros sistemas. O problema de negócio resolvido é a **entrega atômica**: o pagamento registrado e a mensagem que o anuncia existem juntos ou não existem, usando apenas a transação local do banco da aplicação, sem transação distribuída entre banco e broker.
+
+A inclusão de movimentação segue o mesmo padrão: a movimentação gravada e a mensagem `MovimentoRegistrado` que a anuncia existem juntas ou não existem.
 
 O domínio é o lado produtor do padrão outbox. Não existe consumidor da mensagem nesta aplicação: o evento publicado permanece na fila do broker. Consumo, deduplicação no consumidor (inbox), lançamento em extrato e reconciliação de invariantes estão fora do domínio.
 
@@ -124,7 +126,7 @@ CREATE TABLE pagamento (
 
 ### Tabela `movimento` (SQL Server)
 
-Registra movimentações de entrada e saída, cada uma com data e hora, descrição e valor. A tabela é gerada a partir da entidade JPA `MovimentoEntity` na inicialização da aplicação quando ainda não existe; quando já existe, é mantida com as linhas gravadas. Movimentações são incluídas pelo endpoint `POST /movimentos`, descrito abaixo. O domínio não define evento para movimentações, e uma movimentação não tem vínculo com `pagamento` nem com cooperado.
+Registra movimentações de entrada e saída, cada uma com data e hora, descrição e valor. A tabela é gerada a partir da entidade JPA `MovimentoEntity` na inicialização da aplicação quando ainda não existe; quando já existe, é mantida com as linhas gravadas. Movimentações são incluídas pelo endpoint `POST /movimentos`, descrito abaixo, e cada inclusão publica o evento `MovimentoRegistrado`. Uma movimentação não tem vínculo com `pagamento` nem com cooperado.
 
 | Coluna | Tipo | Regra |
 |---|---|---|
@@ -138,7 +140,7 @@ Na entidade, `tipo` é um campo `char`, sem classe de enumeração.
 
 #### `POST /movimentos`
 
-Inclui uma movimentação em uma transação local, confirmada ao final; qualquer falha anterior ao commit desfaz a transação e nada é gravado. A inclusão não grava mensagem na outbox nem publica evento.
+Inclui uma movimentação e grava a mensagem `MovimentoRegistrado` na outbox na mesma transação local, confirmada ao final; qualquer falha anterior ao commit desfaz a transação e não existe nem a movimentação nem a linha da outbox. A publicação no broker começa depois do commit e não faz parte da resposta, com as mesmas garantias de `PagamentoRecebido`: envio repetido até o confirm, marcação de `sent_at`, recuperação dos pendentes na inicialização e at-least-once (regras 8 a 11 e 13).
 
 Requisição — corpo JSON:
 
@@ -155,15 +157,15 @@ Parâmetro de consulta:
 
 | Parâmetro | Tipo | Regra |
 |---|---|---|
-| `forcarFalha` | booleano | opcional, padrão `false`; recurso de demonstração: com `true`, a inclusão falha depois de o `INSERT` chegar ao banco e antes do commit, e a transação é desfeita |
+| `forcarFalha` | booleano | opcional, padrão `false`; recurso de demonstração: com `true`, a inclusão falha depois de o `INSERT` da movimentação chegar ao banco e antes da gravação na outbox e do commit, e a transação é desfeita |
 
 Respostas:
 
 | Status | Quando | Corpo |
 |---|---|---|
-| `201 Created` | movimentação gravada e transação confirmada | a movimentação registrada (tabela abaixo) |
+| `201 Created` | movimentação e mensagem gravadas na mesma transação confirmada | a movimentação registrada (tabela abaixo) |
 | `400 Bad Request` | `dataHora`, `tipo`, `descricao` ou `valor` ausente ou nulo, corpo ilegível ou `forcarFalha` com valor que não é booleano | nada é gravado |
-| `500 Internal Server Error` | falha forçada por `forcarFalha=true`, ou recusa do banco na gravação | nada é gravado |
+| `500 Internal Server Error` | falha forçada por `forcarFalha=true`, recusa do banco na gravação da movimentação ou falha na gravação da outbox | nada é gravado |
 
 Corpo da resposta `201`:
 
@@ -222,6 +224,42 @@ Todos os campos de texto são obrigatórios e não podem ser vazios; um envelope
 - **Publicação obrigatória:** a mensagem é publicada com `mandatory=true`. Sem fila ligada à routing key, o broker devolve a mensagem, a publicação conta como falha e a linha permanece pendente.
 - **Fila de destino:** `pagamentos.pagamento-recebido`, fila quorum (`x-queue-type=quorum`, durável, não exclusiva, sem auto-delete, nenhum outro argumento) ligada ao exchange `mensageria.outbox` com a routing key `PagamentoRecebido`, declarada por Pagamentos na inicialização. Sem consumidor na aplicação, as mensagens publicadas permanecem nessa fila.
 
+### Evento `MovimentoRegistrado` (versão 1)
+
+Gravado na outbox por `POST /movimentos`, na transação da inclusão, depois do `INSERT` da movimentação. Payload, serializado como JSON em UTF-8:
+
+```json
+{
+  "movimentoId": 42,
+  "tipo": "E"
+}
+```
+
+| Campo | Tipo JSON | Regra |
+|---|---|---|
+| `movimentoId` | número inteiro | o `id` da movimentação registrada |
+| `tipo` | string | `E` ou `S`, o `tipo` da movimentação registrada |
+
+Data e hora, descrição e valor da movimentação não fazem parte do payload.
+
+Envelope:
+
+| Campo | Tipo | Valor em `MovimentoRegistrado` |
+|---|---|---|
+| `messageId` | UUID | UUID aleatório novo para cada mensagem; chave de deduplicação do consumidor |
+| `correlationId` | UUID | UUID aleatório gerado a cada inclusão; `POST /movimentos` não lê headers de rastreamento |
+| `idempotencyKey` | texto, até 200 caracteres | o `messageId` da própria mensagem, no formato canônico de UUID |
+| `aggregateKey` | texto, até 100 caracteres | o `id` da movimentação, em decimal (`"42"`) |
+| `type` | texto, até 100 caracteres | `MovimentoRegistrado` |
+| `schemaVersion` | inteiro | `1` |
+| `occurredAt` | instante ISO-8601 UTC | o instante em que o envelope é montado, logo depois do `INSERT` da movimentação; distinto do `data_hora` informado na requisição |
+| `payload` | bytes | o JSON de `MovimentoRegistrado` acima |
+| `traceId` | texto, até 64 caracteres | UUID aleatório em texto gerado a cada inclusão |
+
+Cada movimentação produz uma única mensagem; inclusões repetidas com os mesmos dados geram movimentações e mensagens distintas.
+
+Publicação no RabbitMQ: exchange, corpo, headers, properties e `mandatory=true` iguais aos de `PagamentoRecebido` (seção "Mensagem publicada no RabbitMQ"), com a routing key `MovimentoRegistrado`. A fila de destino é `movimentos.movimento-registrado`, fila quorum (`x-queue-type=quorum`, durável, não exclusiva, sem auto-delete, nenhum outro argumento) ligada ao exchange `mensageria.outbox` com a routing key `MovimentoRegistrado`, declarada na inicialização. Sem consumidor na aplicação, as mensagens publicadas permanecem nessa fila.
+
 ## Restrições e validações
 
 - `cooperadoId` e `valor` são obrigatórios; é a única validação de negócio da solicitação.
@@ -230,12 +268,12 @@ Todos os campos de texto são obrigatórios e não podem ser vazios; um envelope
 - `status` só assume `RECEBIDO`.
 - Os textos do envelope respeitam os limites da tabela: `idempotencyKey` até 200, `aggregateKey` até 100, `type` até 100 e `traceId` até 64 caracteres, nenhum vazio.
 - A gravação na outbox exige uma transação aberta; gravar fora de transação é erro de programação e falha.
-- Cada tentativa de publicação é registrada em log com as chaves de contexto `messageId`, `correlationId`, `aggregateKey` e `traceId`, para que a publicação de um pagamento seja rastreável.
+- Cada tentativa de publicação é registrada em log com as chaves de contexto `messageId`, `correlationId`, `aggregateKey` e `traceId`, para que a publicação de cada pagamento e de cada movimentação seja rastreável.
 
 ## Integrações e dependências externas
 
 - **SQL Server** — banco único da aplicação, com `pagamento`, `movimento` e as tabelas da outbox; a atomicidade depende de os dois serem gravados na mesma transação local desse banco.
-- **RabbitMQ** — broker de destino, com publisher confirms, exchange `direct` e fila quorum.
-- **Mecanismo de outbox compartilhado** — biblioteca corporativa que fornece o envelope, a gravação na outbox, o esquema das tabelas da outbox e o publicador com confirms; a publicação pelo relay por polling dessa biblioteca permanece desligada e o envio é feito pelo disparo assíncrono após o commit com recuperação na inicialização.
+- **RabbitMQ** — broker de destino, com publisher confirms, exchange `direct` e uma fila quorum por evento.
+- **Mecanismo de outbox compartilhado** — biblioteca corporativa que fornece o envelope, a gravação na outbox, o esquema das tabelas da outbox e o publicador com confirms, integrada ao Spring Boot por um artefato compartilhado de auto-configuração; a publicação pelo relay por polling dessa biblioteca permanece desligada e o envio é feito pelo disparo assíncrono após o commit com recuperação na inicialização.
 
 As precondições técnicas do domínio — o que precisa existir para o comportamento acima funcionar e o efeito da ausência de cada uma — estão em [references/technical-dependencies.md](references/technical-dependencies.md).

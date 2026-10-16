@@ -4,9 +4,9 @@
 
 O `demooutboxinbox` é uma POC de demonstração do lado produtor do padrão outbox. Uma aplicação Spring Boot recebe a solicitação de pagamento, registra o `pagamento` e grava a mensagem `PagamentoRecebido` na tabela `outbox` na mesma transação local, de modo que o pagamento e a mensagem existam juntos ou não existam. A publicação no RabbitMQ é disparada de forma assíncrona após o commit.
 
-- **Domínio único:** Pagamentos, produtor de `PagamentoRecebido`.
+- **Domínio único:** Pagamentos, produtor de `PagamentoRecebido` e de `MovimentoRegistrado` (publicado a cada `POST /movimentos`).
 - **Fora do escopo:** consumo de mensagens e inbox (Extrato, deduplicação, ack manual, retry/DLQ do consumidor) e reconciliação das invariantes A1 a A4. Não há consumidor no demo: a mensagem publicada fica na fila do broker.
-- **Mecânica de outbox:** biblioteca `br.com.db1.poc:mensageria-outbox:0.1.0-SNAPSHOT`, mantida no projeto irmão `../mensageria-outbox`.
+- **Mecânica de outbox:** biblioteca `br.com.db1.poc:mensageria-outbox:0.1.0-SNAPSHOT` (projeto irmão `../mensageria-outbox`), integrada ao Spring Boot pelo artefato `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT` (módulo irmão `../mensageria-outbox-spring-boot4`).
 - **Referências de negócio:** `../mensageria-outbox/spec-caso-a-outbox-inbox.md` (Caso A: §5.1, §6.2 e RF-A1), `../mensageria-outbox/README.md` (contrato de uso da biblioteca pelo hospedeiro) e `../mensageria-outbox/Outbox-Assync.puml` (fluxo de disparo assíncrono).
 
 ## Stack
@@ -17,7 +17,8 @@ O `demooutboxinbox` é uma POC de demonstração do lado produtor do padrão out
 - `springdoc-openapi-starter-webmvc-ui` 3.1.0 para o Swagger UI e a especificação OpenAPI gerados em tempo de execução a partir dos controllers.
 - Spring Data JPA (Hibernate), pelo `spring-boot-starter-data-jpa`, para o acesso a dados.
 - SQL Server pelo driver `mssql-jdbc`.
-- RabbitMQ pelo `spring-boot-starter-amqp`; a publicação é feita pelo `RabbitMessagePublisher` da biblioteca `mensageria-outbox`. O `amqp-client` é fixado na versão 5.37.0 (propriedade `rabbit-amqp-client.version` do `pom.xml`), a mesma com que a biblioteca é construída e testada; o `spring-boot-starter-parent` 4.1.1 traria a 5.30.0.
+- `mensageria-outbox-spring-boot4`, auto-configuração da outbox para Spring Boot 4.x: gravação na transação (`OutboxGravador`), envio após o commit e recuperação dos pendentes na inicialização.
+- RabbitMQ pelo `spring-boot-starter-amqp`; a publicação é feita pelo `RabbitMessagePublisher` da biblioteca `mensageria-outbox`, registrado pela auto-configuração. O `amqp-client` é fixado na versão 5.37.0 (propriedade `rabbit-amqp-client.version` do `pom.xml`), a mesma com que a biblioteca é construída e testada; o `spring-boot-starter-parent` 4.1.1 traria a 5.30.0.
 - `spring-boot-starter-actuator` (Micrometer) para observabilidade.
 - Lombok como processador de anotações na compilação principal e de testes.
 - `spring-boot-devtools` em tempo de execução local.
@@ -30,18 +31,17 @@ demooutboxinbox/
 ├── mvnw, mvnw.cmd, .mvn/wrapper/  # Maven Wrapper
 ├── sql/outbox.sql                 # DDL das tabelas da outbox, executado manualmente no banco
 ├── src/main/java/br/com/db1/demooutboxinbox/   # código da aplicação (pacote base)
-│   └── outbox/                    # adaptador Spring Boot da mensageria-outbox
 ├── src/main/resources/application.properties  # configuração da aplicação
 ├── src/test/java/br/com/db1/demooutboxinbox/   # teste de scaffold contextLoads
 └── .agents/                       # contexto, mapas e skills para agentes
 ```
 
-O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) contém o `compose.yaml` do ambiente local, o agregador Maven e a biblioteca `mensageria-outbox`.
+O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) contém o `compose.yaml` do ambiente local, o agregador Maven, a biblioteca `mensageria-outbox` e os módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`.
 
 ## Convenções de arquitetura
 
 - Uma única aplicação com um único banco SQL Server, que contém `pagamento`, `movimento` e as tabelas da outbox (`outbox`, `outbox_lease` e `outbox_read_point`).
-- A integração com a `mensageria-outbox` é feita por um adaptador fino escrito no próprio demo.
+- A integração com a `mensageria-outbox` vem da auto-configuração do `mensageria-outbox-spring-boot4`; o demo não tem código de integração próprio. Cada domínio declara a fila dos eventos que publica e grava a mensagem com `OutboxGravador.gravar(envelope)` dentro da transação do dado de negócio.
 - O `OutboxWriter` grava na mesma conexão JDBC da transação JPA do `pagamento` (`autoCommit=false`); commit, rollback e fechamento da conexão são responsabilidade da aplicação.
 - As tabelas das entidades JPA, como `movimento`, são criadas pelo Hibernate na inicialização, com `spring.jpa.hibernate.ddl-auto=update`: a tabela ausente é criada e a existente é mantida com os dados. O mapeamento de cada entidade declara nome, tipo e tamanho de todas as colunas iguais aos da tabela, porque o `update` altera a coluna divergente e, no SQL Server, a deixa anulável.
 - As tabelas da outbox não são entidades JPA e são criadas pelo script `sql/outbox.sql`, idempotente, executado manualmente no banco antes de subir a aplicação. O script tem a mesma estrutura do `schema.sql` da biblioteca; a aplicação não chama o `OutboxSchemaInstaller`. Não há ferramenta de migração nem evolução versionada do esquema (sem Flyway ou Liquibase); a estrutura de `pagamento` é fixa.
@@ -53,8 +53,8 @@ O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) cont�
 
 ## Restrições globais
 
-- A biblioteca `mensageria-outbox` 0.1.0-SNAPSHOT é resolvida do repositório `JFrog-Sisprime` (`https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/`), declarado no `pom.xml`; o build exige acesso a ele.
-- O projeto é independente do agregador Maven da raiz (`../pom.xml`), que lista apenas o módulo `mensageria-outbox`; o build roda a partir desta pasta, com o wrapper próprio.
+- Os artefatos `mensageria-outbox-spring-boot4` e `mensageria-outbox` 0.1.0-SNAPSHOT são resolvidos do repositório `JFrog-Sisprime` (`https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/`), declarado no `pom.xml`, ou do repositório Maven local depois de `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` na raiz do repositório.
+- O projeto é independente do agregador Maven da raiz (`../pom.xml`), que lista os módulos `mensageria-outbox`, `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`; o build do demo roda a partir desta pasta, com o wrapper próprio.
 - Credenciais de banco e broker chegam por variáveis de ambiente ou pelo arquivo `.env` da raiz do repositório e nunca são versionadas (o `.env` está no `../.gitignore`). As variáveis exigidas são as referenciadas em `../compose.yaml`.
 - Não há testes unitários nem de integração além do teste de scaffold `contextLoads`, que sobe o contexto completo e exige SQL Server e RabbitMQ disponíveis.
 - A documentação da API HTTP é o Swagger UI do springdoc, gerado em tempo de execução e usado para enviar requisições de teste aos endpoints; não há especificação OpenAPI versionada no repositório. Não se mantém outra documentação adicional (sem coleções Postman/Insomnia nem ADRs neste projeto). Os ADRs da biblioteca ficam em `../mensageria-outbox/docs/adr/`.
@@ -66,6 +66,7 @@ Execute a partir desta pasta (`demooutboxinbox/`), exceto quando indicado. No Wi
 | Objetivo | Comando |
 |---|---|
 | Subir SQL Server e RabbitMQ locais (na raiz do repositório, `..`) | `docker compose up -d` |
+| Instalar no repositório Maven local o `mensageria-outbox` e os artefatos Spring Boot (na raiz do repositório, `..`, com Maven e JDK 21) | `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` |
 | Criar as tabelas da outbox no banco local (idempotente; a senha do `sa` vem do `.env`) | `sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql` |
 | Compilar | `./mvnw compile` |
 | Executar a aplicação | `./mvnw spring-boot:run` |

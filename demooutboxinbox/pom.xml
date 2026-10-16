@@ -85,7 +85,7 @@
 
 		<dependency>
 			<groupId>br.com.db1.poc</groupId>
-			<artifactId>mensageria-outbox</artifactId>
+			<artifactId>mensageria-outbox-spring-boot4</artifactId>
 			<version>0.1.0-SNAPSHOT</version>
 		</dependency>
 	</dependencies>

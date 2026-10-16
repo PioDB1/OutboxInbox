@@ -22,7 +22,7 @@ Documento de entrada do negócio: `spec-caso-a-outbox-inbox.md` (raiz). Contexto
 
 ## Stack principal
 
-- Java 21 (versão mínima suportada) nos módulos `mensageria-inbox`, `pagamentos`, `extrato` e `reconciliacao`; o `mensageria-outbox` tem Java 8 (bytecode e API) como piso, e a sua suíte é verificada nos JDKs 8, 11, 17, 21 e 25. O build do repositório roda em JDK 21.
+- Java 21 (versão mínima suportada) nos módulos `mensageria-inbox`, `pagamentos`, `extrato` e `reconciliacao`; o `mensageria-outbox` tem Java 8 (bytecode e API) como piso, e a sua suíte é verificada nos JDKs 8, 11, 17, 21 e 25; os módulos `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x) têm Java 17 como piso (`--release 17`). O build do repositório roda em JDK 21.
 - Maven multi-módulo.
 - Spring Boot 3.x nas aplicações Pagamentos e Extrato; Pagamentos consome o `mensageria-outbox` e Extrato consome o `mensageria-inbox`, cada um por adaptador fino.
 - RabbitMQ com filas quorum, publisher confirms e ack manual no consumidor.
@@ -34,12 +34,15 @@ Documento de entrada do negócio: `spec-caso-a-outbox-inbox.md` (raiz). Contexto
 Estrutura-alvo, um módulo Maven por domínio na raiz:
 
 ```
-pom.xml              agregador Maven (Java 21 nos módulos, exceto o mensageria-outbox; build em JDK 21; dependencyManagement, pluginManagement, enforcer)
+pom.xml              agregador Maven (Java 21 nos módulos, exceto o mensageria-outbox e os mensageria-outbox-spring-boot*; build em JDK 21; dependencyManagement, pluginManagement, enforcer)
 compose.yaml         SQL Server, RabbitMQ e Toxiproxy para uso local
 .env.example         variáveis do compose.yaml (o .env local não é versionado)
 docker/              configuração do Toxiproxy usada pelo compose.yaml
 docs/adr/            ADRs e índice
 mensageria-outbox/   lado produtor, sem Spring Boot, Java 8 como piso (implementado)
+mensageria-outbox-spring-boot3/        auto-configuração do mensageria-outbox para Spring Boot 3.x, Java 17 como piso (implementado)
+mensageria-outbox-spring-boot4/        auto-configuração do mensageria-outbox para Spring Boot 4.x, Java 17 como piso (implementado)
+mensageria-outbox-spring-boot-shared/  código-fonte comum aos dois módulos acima; não é módulo Maven
 mensageria-inbox/    lado consumidor, sem Spring Boot
 pagamentos/          aplicação Spring Boot (produtor)
 extrato/             aplicação Spring Boot (consumidor)
@@ -47,13 +50,14 @@ reconciliacao/       job de reconciliação
 .agents/             contexto, mapas e skills para agentes
 ```
 
-Os módulos `mensageria-inbox`, `pagamentos`, `extrato` e `reconciliacao` ainda não existem. O `README.md` e o workflow `.github/workflows/gradle.yml` herdados de template descrevem Gradle e JDK 8/11, que não correspondem à stack acima; não os use como fonte de build ou de versão. O README do módulo implementado está em `mensageria-outbox/README.md`.
+Os módulos `mensageria-inbox`, `pagamentos`, `extrato` e `reconciliacao` ainda não existem. O `README.md` e o workflow `.github/workflows/gradle.yml` herdados de template descrevem Gradle e JDK 8/11, que não correspondem à stack acima; não os use como fonte de build ou de versão. Os READMEs dos módulos implementados estão em `mensageria-outbox/README.md`, `mensageria-outbox-spring-boot3/README.md`, `mensageria-outbox-spring-boot4/README.md` e `mensageria-outbox-spring-boot-shared/README.md`.
 
 ## Convenções arquiteturais
 
 - Um banco/schema separado por aplicação; não existe transação local entre Pagamentos e Extrato.
 - Sem XA, sem JTA, sem transaction manager externo.
 - `mensageria-outbox` e `mensageria-inbox` são independentes entre si e não dependem de Spring Boot; cada um carrega a própria definição do envelope padrão, e cada framework entra por um adaptador fino.
+- No lado produtor, o Spring Boot entra pelos módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`, um artefato por linha do Spring Boot, com as dependências do Spring como `provided` (vale a versão do Spring Boot da aplicação). O código comum aos dois fica em `mensageria-outbox-spring-boot-shared/`, incluído nas fontes de ambos pelo `build-helper-maven-plugin`; cada módulo guarda só `OutboxRabbitConnectionFactoryConfiguration` e o arquivo `AutoConfiguration.imports`, e uma alteração no código comum é compilada e testada nos dois. A auto-configuração publica cada mensagem após o commit, com ordem por `aggregateKey`, e recupera as pendentes na inicialização, sem o relay por polling (estratégias, lease, retenção, métricas); a aplicação que precisa do relay usa o da biblioteca, e nunca os dois juntos, porque competiriam pelas mesmas linhas pendentes.
 - Cada módulo conhece o RabbitMQ apenas por uma interface (publicação no outbox, consumo no inbox); trocar de broker exige só um novo adaptador.
 - Tabelas e acessos de outbox, inbox e lease são isolados por dialeto de banco: SQL Server para a outbox e o relay de Pagamentos (as duas estratégias de relay usam `UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion` com `min_active_rowversion()`, ausentes no H2); H2 em arquivo onde esses recursos não são necessários (inbox de Extrato).
 - As duas estratégias de relay (claim e ponto de leitura) são implementadas atrás de uma única interface.
@@ -75,6 +79,7 @@ Build Maven multi-módulo, a partir da raiz (não há wrapper `mvnw` nem plugin 
 mvn clean verify                 # compila e executa os testes de todos os módulos
 mvn -pl <módulo> -am test        # testa um módulo e suas dependências
 mvn -pl mensageria-outbox verify -Djvm=<JDK_HOME>/bin/java   # suíte do mensageria-outbox em um JDK da matriz (8, 11, 17, 21, 25)
+mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install   # instala no repositório Maven local os dois artefatos Spring Boot e o mensageria-outbox
 ```
 
 O Maven e o compilador rodam em JDK 21; `-Djvm` troca só a JVM em que surefire e failsafe executam os testes.

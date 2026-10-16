@@ -1,0 +1,46 @@
+{
+  "artifactLanguage": "pt",
+  "workMode": "maintenance",
+  "discoveryAnswers": {
+    "systemType": "POC para teste de outbox-inbox",
+    "scope": {
+      "type": "whole_project"
+    },
+    "restrictions": []
+  },
+  "domainIndex": [
+    {
+      "name": "Pagamentos",
+      "slug": "pagamentos",
+      "dependsOn": [],
+      "order": 0,
+      "documented": true,
+      "specified": true
+    }
+  ],
+  "technicalSkillIndex": [
+    {
+      "name": "Integração do mensageria-outbox com Spring Boot",
+      "slug": "integracao-mensageria-outbox-spring-boot",
+      "description": "Como integrar o mensageria-outbox ao Spring Boot 4.1.1 com Spring Data JPA: instalação do esquema, topologia RabbitMQ, OutboxWriter na conexão JDBC da transação JPA, publicação assíncrona após o commit com RabbitMessagePublisher e marcação de sent_at, e recuperação dos pendentes na inicialização. Carregar ao gravar ou publicar eventos pela outbox.",
+      "documented": true
+    }
+  ],
+  "authoritativeDocsSource": {
+    "kind": "skills"
+  },
+  "implementedSpecs": [
+    {
+      "slug": "001-pagamentos-conexao-sqlserver-local",
+      "closedAt": "2026-10-15T18:54:45.644Z"
+    },
+    {
+      "slug": "002-pagamentos-entidade-movimento",
+      "closedAt": "2026-10-15T19:20:50.536Z"
+    },
+    {
+      "slug": "003-pagamentos-endpoint-inclusao-movimento",
+      "closedAt": "2026-10-16T13:47:39.408Z"
+    }
+  ]
+}

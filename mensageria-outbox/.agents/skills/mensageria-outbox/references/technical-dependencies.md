@@ -18,7 +18,7 @@ Cada item diz o que é e o que afeta no domínio se faltar.
 - **SQL Server** — banco da outbox, do lease e do relay, executado em Docker; as duas estratégias de relay dependem dos recursos `UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion`/`min_active_rowversion()`. O H2 não oferece esses recursos e não é usado para o relay. Sem ele nenhuma das estratégias de relay funciona.
 - **RabbitMQ** — broker com filas quorum e publisher confirms, acessado por adaptador. Sem ele não há publicação.
 - **Micrometer** — métricas de publicação (lag da outbox, pendentes, tentativas de retry). Sem ele as métricas não são expostas.
-- **Java 8 e Maven multi-módulo** — plataforma e build; Java 8 (bytecode e API) é o piso do módulo, compilado com `--release 8` em um build em JDK 21, e a suíte é verificada nos JDKs 8, 11, 17, 21 e 25. Sem framework de aplicação no módulo, com adaptadores finos para Spring Boot 3.x. Sem a plataforma o módulo não compila nem executa.
+- **Java 8 e Maven multi-módulo** — plataforma e build; Java 8 (bytecode e API) é o piso do módulo, compilado com `--release 8` em um build em JDK 21, e a suíte é verificada nos JDKs 8, 11, 17, 21 e 25. Sem framework de aplicação no módulo; a integração com Spring Boot vive nos módulos `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x), com Java 17 como piso. Sem a plataforma o módulo não compila nem executa.
 
 ## Dependências identificadas na investigação do domínio
 

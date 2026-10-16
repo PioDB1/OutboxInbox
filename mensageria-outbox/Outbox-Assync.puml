@@ -13,7 +13,7 @@ activate App
     create control "Outbox Thread" as OutboxAsync
     App -->> OutboxAsync : Dispara envio de mensagem para fila
 deactivate App
-group x
+group x as dd
 activate OutboxAsync
 loop Confirmação de recebimento
     OutboxAsync -> fila : Enviar dados para fila
@@ -33,7 +33,7 @@ group Inicialização da aplicação
     DB --> App: Retorna dados pendentes
     create control "Outbox Thread" as OutboxAsync1
     App-->> OutboxAsync1: Enfileirar dados pendentes
-    ref x
+    ref over dd: Processamento de dados pendentes
     end
     loop Confirmação de recebimento
         OutboxAsync1 -> fila : Enviar dados para fila

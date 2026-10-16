@@ -80,7 +80,7 @@ Numeração própria desta skill (R1, R2, ...).
 ### Dialeto e portabilidade
 
 - **R20.** O acesso a banco é isolado por **dialeto**: SQL Server para a outbox, o lease e o relay (as duas estratégias dependem de `UPDLOCK`/`READPAST`/`ROWLOCK` e de `rowversion` com `min_active_rowversion()`, que o H2 não oferece). O relay não é executado sobre H2.
-- **R21.** O módulo **não depende de framework de aplicação**; cada framework entra por um adaptador fino.
+- **R21.** O módulo **não depende de framework de aplicação**; cada framework entra por um adaptador fino, fora do módulo. O Spring Boot entra pelos módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`, um por linha do Spring Boot, com o Spring como dependência `provided` e o código comum em `mensageria-outbox-spring-boot-shared/`. A auto-configuração desses módulos grava na transação da aplicação, publica cada mensagem após o commit e recupera as pendentes na inicialização; ela preserva a ordem por `aggregateKey` de R11 (mensagens da mesma chave publicadas uma de cada vez, em ordem de `seq`, com a consulta de linhas anteriores pendentes por `READUNCOMMITTED`), não instancia o relay por polling (estratégias, lease, retenção e métricas), e a aplicação não usa os dois caminhos juntos, porque competiriam pelas mesmas linhas pendentes. Uso e comportamento: `mensageria-outbox-spring-boot3/README.md` e `mensageria-outbox-spring-boot4/README.md`.
 - **R22.** O módulo conhece o broker apenas por uma **interface de publicação**. Trocar de broker exige somente um novo adaptador. O adaptador RabbitMQ é o único que conhece detalhes do broker (filas quorum, publisher confirms).
 
 ### Retenção da outbox
@@ -203,7 +203,7 @@ As dependências técnicas e as precondições de ambiente do domínio estão em
 
 ## Pontos em aberto
 
-- Se o código da PoC é descartável ou evolui para o starter interno é uma pergunta sem decisão; não bloqueia o domínio, e o isolamento do módulo (sem framework de aplicação, broker por interface) o mantém reaproveitável.
+- A integração com Spring Boot do lado produtor vive em `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4` (R21). Se o restante do código da PoC é descartável ou evolui para uso em produção é uma pergunta sem decisão; não bloqueia o domínio, e o isolamento do módulo (sem framework de aplicação, broker por interface) o mantém reaproveitável.
 - A confirmação da semântica de `min_active_rowversion()` (R17) deve ser verificada na implementação. A compatibilidade de Micrometer e Testcontainers com a plataforma do módulo (Java 8 como piso) é verificada pela suíte do módulo nos JDKs 8, 11, 17, 21 e 25.
 
 ## Manutenção
