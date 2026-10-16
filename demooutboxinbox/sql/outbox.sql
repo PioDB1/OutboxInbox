@@ -67,3 +67,24 @@ BEGIN
     );
 END;
 GO
+
+
+-- master.dbo.movimento definition
+
+-- Drop table
+
+-- DROP TABLE master.dbo.movimento;
+
+IF OBJECT_ID(N'movimento', N'U') IS NULL
+BEGIN
+    CREATE TABLE master.dbo.movimento (
+        id bigint IDENTITY(1,1) NOT NULL,
+        data_hora datetime2 NOT NULL,
+        descricao varchar(255) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+        tipo char(1) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
+        valor decimal(18,2) NOT NULL,
+        CONSTRAINT PK__moviment__3213E83F14EF36DB PRIMARY KEY (id)
+    );
+    ALTER TABLE master.dbo.movimento WITH NOCHECK ADD CONSTRAINT CK__movimento__tipo__1293BD5E CHECK (([tipo]='S' OR [tipo]='E'));
+END;
+GO
