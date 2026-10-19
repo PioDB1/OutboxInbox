@@ -6,9 +6,9 @@
 
     <parent>
         <groupId>br.com.db1.poc</groupId>
-        <artifactId>outbox-inbox-poc</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <artifactId>mensageria-outbox</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+        <relativePath>../mensageria-outbox/pom.xml</relativePath>
     </parent>
 
     <artifactId>mensageria-outbox-spring-boot4</artifactId>
@@ -85,6 +85,22 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-bytecode</id>
+                        <configuration>
+                            <rules>
+                                <enforceBytecodeVersion>
+                                    <maxJdkVersion>17</maxJdkVersion>
+                                </enforceBytecodeVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <parameters>true</parameters>
@@ -124,4 +140,23 @@
             </plugin>
         </plugins>
     </build>
+    <repositories>
+        <repository>
+            <id>JFrog-Sisprime</id>
+            <name>JFrog - Maven artifact</name>
+            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>JFrog-Sisprime</id>
+            <name>JFrog - Maven artifact</name>
+            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
+            <layout>default</layout>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+
 </project>

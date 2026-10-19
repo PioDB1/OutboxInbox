@@ -32,7 +32,7 @@ public class MovimentoService {
 	 * chegar ao banco e antes do commit, e o Spring desfaz a transação.
 	 */
 	@Transactional
-	public MovimentoResponse incluir(MovimentoRequest request, boolean forcarFalha) {
+	public MovimentoResponse incluir(MovimentoRequest request, boolean forcarFalha, boolean incluirEvento) {
 		MovimentoEntity entidade = new MovimentoEntity();
 		entidade.setDataHora(request.dataHora());
 		entidade.setTipo(request.tipo());
@@ -46,7 +46,9 @@ public class MovimentoService {
 					"Falha forçada por forcarFalha=true após o INSERT do movimento id=" + entidade.getId());
 		}
 
-		gravador.gravar(envelopeRegistrado(entidade));
+		if (incluirEvento) {
+			gravador.gravar(envelopeRegistrado(entidade));
+		}
 
 		entityManager.refresh(entidade);
 		return MovimentoResponse.from(entidade);

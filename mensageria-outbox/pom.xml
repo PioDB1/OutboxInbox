@@ -4,15 +4,15 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-<!--    <parent>-->
-        <groupId>br.com.db1.poc</groupId>
-<!--        <artifactId>outbox-inbox-poc</artifactId>-->
-        <version>0.1.0-SNAPSHOT</version>
-<!--    </parent>-->
+    <groupId>br.com.db1.poc</groupId>
+    <version>0.2.0-SNAPSHOT</version>
     <artifactId>mensageria-outbox</artifactId>
 
     <name>Mensageria Outbox</name>
-    <description>Lado produtor da entrega atômica de mensagens: envelope, outbox, relay, lease, publicação com confirms, retenção e métricas.</description>
+    <description>Lado produtor da entrega atômica de mensagens: envelope, outbox, relay, lease, publicação com confirms,
+        retenção e métricas.
+    </description>
+    <packaging>pom</packaging>
 
     <properties>
         <!-- Piso Java 8: o release 8 vale para o código principal e para o de teste. -->
@@ -23,6 +23,8 @@
         <extra-enforcer-rules.version>1.12.1</extra-enforcer-rules.version>
         <!-- Limites explícitos de heap e de memória direta dos testes de integração (R26). -->
         <failsafe.argLine>-Xmx256m -XX:MaxDirectMemorySize=64m</failsafe.argLine>
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-failsafe-plugin.version>3.5.1</maven-failsafe-plugin.version>
     </properties>
 
     <dependencies>
@@ -91,6 +93,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <compilerArgs>
                         <arg>-Xlint:-options</arg>
@@ -121,7 +124,8 @@
                                     <maxJdkVersion>8</maxJdkVersion>
                                     <!-- Filas VarHandle do netty: só carregadas a partir do JDK 11 (PlatformDependent.hasVarHandle). -->
                                     <ignoreClasses>
-                                        <ignoreClass>io.netty.util.internal.shaded.org.jctools.queues.varhandle.*</ignoreClass>
+                                        <ignoreClass>io.netty.util.internal.shaded.org.jctools.queues.varhandle.*
+                                        </ignoreClass>
                                     </ignoreClasses>
                                 </enforceBytecodeVersion>
                             </rules>
@@ -132,6 +136,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
                 <configuration>
                     <argLine>${failsafe.argLine}</argLine>
                     <includes>

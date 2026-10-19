@@ -22,7 +22,7 @@ public class MovimentoController {
 	 * O {@code @ResponseStatus} define o {@code 201} da resposta e o status documentado no Swagger UI;
 	 * o status de um {@code ResponseEntity} só existe em tempo de execução, e o springdoc documentaria {@code 200}.
 	 */
-	@PostMapping
+	@PostMapping("/inclusao")
 	@ResponseStatus(HttpStatus.CREATED)
 	public MovimentoResponse incluir(@RequestBody MovimentoRequest request,
 			@RequestParam(defaultValue = "false") boolean forcarFalha) {
@@ -31,7 +31,19 @@ public class MovimentoController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"dataHora, tipo, descricao e valor são obrigatórios");
 		}
-		return service.incluir(request, forcarFalha);
+		return service.incluir(request, forcarFalha, true);
+	}
+
+	@PostMapping("/inclusao_sem_evento")
+	@ResponseStatus(HttpStatus.CREATED)
+	public MovimentoResponse incluirSemEvento(@RequestBody MovimentoRequest request,
+	                                 @RequestParam(defaultValue = "false") boolean forcarFalha) {
+		if (request.dataHora() == null || request.tipo() == null || request.descricao() == null
+				|| request.valor() == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+					"dataHora, tipo, descricao e valor são obrigatórios");
+		}
+		return service.incluir(request, forcarFalha, false);
 	}
 
 }
