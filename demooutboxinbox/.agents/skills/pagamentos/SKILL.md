@@ -191,6 +191,21 @@ Inclui uma movimentação na tabela `movimento` em transação local, sem gravar
 | `400 Bad Request` | `dataHora`, `tipo`, `descricao` ou `valor` ausente ou nulo, corpo ilegível ou `forcarFalha` com valor que não é booleano | nada é gravado |
 | `500 Internal Server Error` | falha forçada por `forcarFalha=true` ou recusa do banco na gravação da movimentação | nada é gravado |
 
+#### `POST /movimentos/inclusao_dupla`
+
+Inclui duas movimentações na tabela `movimento` e grava dois eventos `MovimentoRegistrado` na outbox em uma única transação local, confirmada ao final. Qualquer falha desfaz a transação completa: nenhuma das movimentações é persistida e nenhuma mensagem é publicada. A publicação segue a ordem de gravação na outbox.
+
+Requisição — corpo JSON:
+Lista com exatamente dois objetos `MovimentoRequest` (campos `dataHora`, `tipo`, `descricao` e `valor` obrigatórios).
+
+Parâmetro de consulta:
+- `posicaoFalha` (inteiro): opcional, padrão `0`. Com `1`, a falha ocorre após a 1ª movimentação e seu evento; com `2`, após a 2ª movimentação e seu evento, antes do commit.
+
+Respostas:
+- `201 Created`: lista das duas movimentações gravadas.
+- `400 Bad Request`: lista com tamanho diferente de 2, campos obrigatórios ausentes ou `posicaoFalha` inválido.
+- `500 Internal Server Error`: falha forçada por `posicaoFalha` ou recusa do banco.
+
 ### Evento `PagamentoRecebido` (versão 1)
 
 Payload, serializado como JSON em UTF-8:

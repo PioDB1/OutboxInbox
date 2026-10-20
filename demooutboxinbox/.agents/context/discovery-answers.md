@@ -54,6 +54,7 @@ Restrições impostas pelo contrato da biblioteca `mensageria-outbox` (`../mensa
 | D11 | Os artefatos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4` preservam a ordem por `aggregateKey` (R11 da `mensageria-outbox`): mensagens da mesma chave publicadas uma de cada vez, em ordem de `seq`, com a consulta de linhas anteriores pendentes por `READUNCOMMITTED` antes de cada publicação | Lacuna das garantias de publicação dos artefatos | Skill técnica `integracao-mensageria-outbox-spring-boot`; READMEs dos artefatos |
 | D12 | Cada pasta do componente (`mensageria-outbox`, `mensageria-outbox-spring-boot-shared`, `mensageria-outbox-spring-boot3`, `mensageria-outbox-spring-boot4`) e o `demooutboxinbox` têm o próprio `AGENTS.md` e `.agents/`, com uma skill de negócio por pasta | Lacuna da organização das skills do componente | Convenção em `AGENTS.md` |
 | D13 | O registro de pagamento (`POST /pagamentos`, tabela `pagamento`, `PagamentoRecebido`) permanece na skill do domínio como escopo a implementar por spec | Lacuna do escopo de Pagamentos na validação do componente | Domínio Pagamentos; mapa funcional |
+| D14 | O endpoint `POST /movimentos/inclusao_dupla` demonstra a inclusão atômica de dois movimentos e dois eventos na mesma transação, com suporte a falha forçada por posição (`posicaoFalha`) | Pedido do requisitante na spec `004-movimentos-inclusao-dupla` | Domínio Pagamentos; skill `pagamentos` |
 
 ## Formas de documentação a manter
 

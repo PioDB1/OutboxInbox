@@ -21,7 +21,7 @@ A mecânica de outbox vem da biblioteca `mensageria-outbox` e entra pela auto-co
 - `../compose.yaml` — cabeçalho "Ambiente local do relay de Pagamentos".
 - `../mensageria-outbox/README.md` — exemplo de uso do hospedeiro com o tipo `PagamentoRecebido` e o exchange `mensageria.outbox`.
 - `../mensageria-outbox/Outbox-Assync.puml` — fluxo de disparo assíncrono após a gravação e de reenvio dos pendentes na inicialização.
-- `src/main/java/br/com/db1/demooutboxinbox/movimento/` — `POST /movimentos/inclusao` (movimentação e `MovimentoRegistrado` na mesma transação) e `POST /movimentos/inclusao_sem_evento` (só a movimentação), com a fila `movimentos.movimento-registrado` declarada na inicialização.
+- `src/main/java/br/com/db1/demooutboxinbox/movimento/` — `POST /movimentos/inclusao` (movimentação e `MovimentoRegistrado` na mesma transação), `POST /movimentos/inclusao_sem_evento` (só a movimentação) e `POST /movimentos/inclusao_dupla` (inclusão atômica de dois movimentos com eventos, com suporte a falha forçada por posição), com a fila `movimentos.movimento-registrado` declarada na inicialização.
 
 **Estado da implementação:** a inclusão de movimentação está implementada. O registro de pagamento (`POST /pagamentos`, tabela `pagamento`, evento `PagamentoRecebido` e fila `pagamentos.pagamento-recebido`) é escopo do domínio descrito na skill, sem código, a implementar por spec.
 
@@ -33,7 +33,7 @@ A mecânica de outbox vem da biblioteca `mensageria-outbox` e entra pela auto-co
 - `pagamento` e a linha da `outbox` são gravados na mesma transação local JPA, no único banco SQL Server da aplicação; falha na transação não deixa nenhum dos dois.
 - Status inicial `RECEBIDO`; valor com duas casas decimais; `cooperadoId` numérico.
 - `PagamentoRecebido` v1 carrega `pagamentoId`, `cooperadoId` e `valor`, com `pagamentoId` como `aggregateKey`; a publicação usa routing key igual ao `type`.
-- `POST /movimentos/inclusao` grava a movimentação e a mensagem `MovimentoRegistrado` v1 (`movimentoId` e `tipo`, com o `id` da movimentação como `aggregateKey`) na mesma transação, publicada na fila `movimentos.movimento-registrado`; `POST /movimentos/inclusao_sem_evento` grava só a movimentação.
+- `POST /movimentos/inclusao` grava a movimentação e a mensagem `MovimentoRegistrado` v1 (`movimentoId` e `tipo`, com o `id` da movimentação como `aggregateKey`) na mesma transação, publicada na fila `movimentos.movimento-registrado`; `POST /movimentos/inclusao_sem_evento` grava só a movimentação; `POST /movimentos/inclusao_dupla` grava dois movimentos e dois eventos na mesma transação, preservando a ordem de gravação na outbox.
 - Depois do commit, a aplicação dispara a publicação de forma assíncrona; a mensagem só é considerada enviada depois do confirm do broker, quando a linha da outbox recebe `sent_at`. Até o confirm, o envio é repetido.
 - Na inicialização, a aplicação consulta as linhas pendentes da outbox (`sent_at` nulo) e as enfileira para o mesmo envio assíncrono, cobrindo publicações interrompidas por queda da aplicação ou do broker.
 - Publicação at-least-once: a mesma mensagem pode ser publicada mais de uma vez (por exemplo, queda entre o confirm e a marcação de `sent_at`).

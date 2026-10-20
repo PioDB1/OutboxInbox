@@ -1,5 +1,7 @@
 package br.com.db1.demooutboxinbox.movimento;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,6 +46,22 @@ public class MovimentoController {
 					"dataHora, tipo, descricao e valor são obrigatórios");
 		}
 		return service.incluir(request, forcarFalha, false);
+	}
+
+	@PostMapping("/inclusao_dupla")
+	@ResponseStatus(HttpStatus.CREATED)
+	public List<MovimentoResponse> incluirDuplo(@RequestBody List<MovimentoRequest> request,
+			@RequestParam(defaultValue = "0") int posicaoFalha) {
+		if (request.size() != 2) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A lista deve conter exatamente 2 movimentos");
+		}
+		for (MovimentoRequest req : request) {
+			if (req.dataHora() == null || req.tipo() == null || req.descricao() == null || req.valor() == null) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+						"dataHora, tipo, descricao e valor são obrigatórios para ambos os movimentos");
+			}
+		}
+		return service.incluirDuplo(request, posicaoFalha);
 	}
 
 }
