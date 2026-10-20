@@ -2,7 +2,16 @@
 
 Lado produtor da entrega atômica de mensagens do padrão outbox/inbox: envelope padrão, inserção na outbox na transação local da aplicação, relay com duas estratégias atrás de uma única interface, lease de relay único, publicação no RabbitMQ com publisher confirms, retry com backoff, retenção da outbox e métricas de publicação.
 
-É uma biblioteca com piso Java 8 (bytecode 52 e API do Java 8), que executa do JDK 8 ao JDK 25, sem Spring Boot nem executável próprio. A aplicação hospedeira fornece o `DataSource` (SQL Server), o `MessagePublisher` e o `MeterRegistry`, e controla o ciclo de vida do relay. Contexto e decisões: `.agents/specs/001-mensageria-outbox-implementacao-modulo/` e a skill `.agents/skills/mensageria-outbox/SKILL.md`.
+É uma biblioteca com piso Java 8 (bytecode 52 e API do Java 8), que executa do JDK 8 ao JDK 25, sem Spring Boot nem executável próprio. A aplicação hospedeira fornece o `DataSource` (SQL Server), o `MessagePublisher` e o `MeterRegistry`, e controla o ciclo de vida do relay. Contexto e decisões: `.agents/specs/001-mensageria-outbox-implementacao-modulo/` e a skill `.agents/skills/mensageria-outbox/SKILL.md`; defeitos conhecidos, registrados sem correção: `.agents/context/pendencias.md`.
+
+## Artefatos
+
+| Artefato | Pasta | Papel |
+|---|---|---|
+| `br.com.db1.poc:mensageria-outbox:0.3.0-SNAPSHOT` (empacotamento `pom`) | `./` | agrega o módulo `core` e é o POM pai do `core`, do `mensageria-outbox-spring-boot3` e do `mensageria-outbox-spring-boot4`; fixa `com.rabbitmq:amqp-client` 5.37.0 no `dependencyManagement`, que prevalece sobre o BOM do Spring Boot importado pelos adaptadores, e configura compilador, enforcer de bytecode e failsafe |
+| `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` | `core/` | a biblioteca de que a aplicação hospedeira depende; código, testes e recursos em `core/src/` |
+
+O `pom.xml` da raiz do repositório só agrega este POM e os dois adaptadores; ele não é POM pai de nenhum deles.
 
 ## Uso pelo hospedeiro
 
@@ -86,13 +95,13 @@ Cada tentativa de publicação roda com as chaves de MDC `messageId`, `correlati
 |---|---|
 | Java (piso do módulo) | 8 (`--release 8`) |
 | JDKs da matriz de verificação | 8, 11, 17, 21 e 25 |
-| JDK do build | 21 |
-| Maven | 3.9 ou superior |
+| JDK do build | 21 (exigido pelo enforcer do agregador da raiz, no build a partir da raiz) |
+| Maven | 3.9 ou superior (exigido pelo mesmo enforcer da raiz) |
 | `com.rabbitmq:amqp-client` | 5.37.0 |
 | `com.microsoft.sqlserver:mssql-jdbc` | 13.4.0.jre8 (runtime) |
 | `io.micrometer:micrometer-core` | 1.17.1 |
 | `org.slf4j:slf4j-api` | 2.0.20 |
-| JUnit (teste) | 5.14.4 |
+| JUnit (teste) | 5.11.0 |
 | Testcontainers | 2.0.5 |
 | Logback (teste) | 1.3.16 |
 | SQL Server | `mcr.microsoft.com/mssql/server:2019-CU32-ubuntu-20.04` |
@@ -117,14 +126,15 @@ O Toxiproxy do `compose.yaml` expõe a API de controle em `TOXIPROXY_API_PORT` e
 
 ### Matriz de JDKs
 
-O build exige JDK 21 (enforcer da raiz); o compilador usa `--release 8` e o artefato tem bytecode 52. Cada JDK da matriz (8, 11, 17, 21 e 25) executa a suíte do módulo com um ciclo `verify`, a partir da raiz, informando o `java` do JDK em `-Djvm`:
+O build a partir da raiz exige JDK 21 (enforcer do agregador da raiz); o compilador usa `--release 8` e o artefato `mensageria-outbox-core` tem bytecode 52. Cada JDK da matriz (8, 11, 17, 21 e 25) executa a suíte do `core` com um ciclo `verify`, a partir da raiz, informando o `java` do JDK em `-Djvm` (propriedade nativa do surefire e do failsafe):
 
 ```
-mvn -pl mensageria-outbox verify -Djvm=<JDK_HOME>/bin/java
+mvn -pl mensageria-outbox/core verify -Djvm=<JDK_HOME>/bin/java
 ```
 
-- O Maven e o compilador seguem no JDK 21; `-Djvm` troca só a JVM dos forks do surefire (`*Test`) e do failsafe (`*IT`). A propriedade `java.version` dos relatórios XML de `target/surefire-reports` e `target/failsafe-reports` registra o JDK que executou os testes.
+- O seletor `-pl mensageria-outbox` escolhe só o POM agregador e não executa nenhum teste; use `-pl mensageria-outbox/core` ou `-pl :mensageria-outbox-core`.
+- O Maven e o compilador seguem no JDK 21; `-Djvm` troca só a JVM dos forks do surefire (`*Test`) e do failsafe (`*IT`). A propriedade `java.version` dos relatórios XML de `core/target/surefire-reports` e `core/target/failsafe-reports` registra o JDK que executou os testes.
 - Os `*Test` rodam sem Docker. Os `*IT` exigem Docker em execução e são ignorados sem ele; uma execução sem Docker não verifica o relay contra SQL Server e RabbitMQ.
-- Com `mvn -pl mensageria-outbox test -Djvm=<JDK_HOME>/bin/java` só os `*Test` executam.
+- Com `mvn -pl mensageria-outbox/core test -Djvm=<JDK_HOME>/bin/java` só os `*Test` executam.
 
-Barreiras contra a volta de recursos posteriores ao Java 8: a compilação com `--release 8` recusa sintaxe e API novas; a regra `enforceBytecodeVersion` (execução `enforce-bytecode`, fase `validate`) recusa dependência com bytecode acima do Java 8 e cita o artefato; `BytecodeLevelTest` confere a versão principal 52 de todo `.class` de `target/classes` e `target/test-classes`; `PackageBoundaryTest` recusa imports `sun.*`, `com.sun.*` e `jdk.internal.*` e chamadas a `setAccessible` em `src/main`.
+Barreiras contra a volta de recursos posteriores ao Java 8: a compilação com `--release 8` recusa sintaxe e API novas; a regra `enforceBytecodeVersion` (execução `enforce-bytecode`, fase `validate`) recusa dependência com bytecode acima do Java 8 e cita o artefato; `BytecodeLevelTest` confere a versão principal 52 de todo `.class` de `core/target/classes` e `core/target/test-classes`; `PackageBoundaryTest` recusa imports `sun.*`, `com.sun.*` e `jdk.internal.*` e chamadas a `setAccessible` em `core/src/main`.

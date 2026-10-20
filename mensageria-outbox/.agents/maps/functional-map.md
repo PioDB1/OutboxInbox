@@ -1,6 +1,6 @@
 ---
 name: functional-map
-description: Mapa dos cinco domínios da PoC outbox/inbox (Mensageria Outbox, Mensageria Inbox, Pagamentos, Extrato, Reconciliação) com fronteiras, dependências, dependências técnicas, regras inferidas, confiança e ordem de implementação sugerida.
+description: Mapa dos cinco domínios da PoC outbox/inbox (Mensageria Outbox, Mensageria Inbox, Pagamentos, Extrato, Reconciliação) com fronteiras, estado de implementação, dependências, dependências técnicas, regras inferidas, confiança e ordem de implementação sugerida.
 metadata:
   author: clovis-cli
   responsibility: "Map of identification of the business domains (bounded contexts), their boundaries, dependencies and suggested implementation order. Index of domains for skill generation and the spec-driven flow; it does not detail business rules nor duplicate the cross-cutting decisions, which live in the discovery-answers.md."
@@ -8,7 +8,7 @@ metadata:
 
 # Mapa funcional
 
-Projeto greenfield sem código: a evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21 nos domínios, exceto o Mensageria Outbox, que tem Java 8 como piso; Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo.
+A evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21 nos domínios, exceto o Mensageria Outbox, que tem Java 8 como piso; Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay, versionamento dos artefatos do componente) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo. Cada bloco traz o estado de implementação do domínio; só o Mensageria Outbox tem código.
 
 A mensageria é dividida em dois domínios independentes, um por lado da entrega: o produtor (`mensageria-outbox`) e o consumidor (`mensageria-inbox`). Nenhum depende do outro; cada um carrega a própria definição do envelope padrão.
 
@@ -17,6 +17,8 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 **Objetivo de negócio:** garantir que a mensagem de um fato de negócio exista se, e somente se, o dado de negócio do produtor existir, por meio de envelope padrão, outbox gravada na transação local, relay com publisher confirms, lease de relay único, retry/backoff de publicação, retenção da outbox e métricas de publicação.
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §2 (linhas 16-26), §4 (36-47), §5.1 tabela `outbox` (51-71), §6.1 (95-106), RF-A2 a RF-A5, RF-A9 e RF-A11 (§7, 122-132), §8 (134-146), §9 (148-153), tarefas 2 e 3 (§12, 222-223).
+
+**Estado de implementação:** implementado. A biblioteca é o artefato `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` (`mensageria-outbox/core/`), filho do POM `mensageria-outbox`, com as duas estratégias de relay, lease, publicação com confirms, backoff, retenção e métricas. A integração com Spring Boot está nos módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4` (código comum em `mensageria-outbox-spring-boot-shared/`), consumidos pela demonstração `demooutboxinbox`. O ADR 0001 está `Proposto`, sem estratégia escolhida. Na validação de 2026-10-20 (JDK 21, Maven 3.9.9) os testes `*Test` passaram e os `*IT` foram ignorados por falta de Docker. Defeitos conhecidos: `pendencias.md`.
 
 **Dependências entre domínios:** nenhuma.
 
@@ -35,7 +37,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - SQL Server — banco da outbox, do lease e do relay de Pagamentos, executado em Docker; as duas estratégias de relay dependem dos recursos `UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion`/`min_active_rowversion()`. O H2 não oferece esses recursos e não é usado para o relay.
 - RabbitMQ — broker com filas quorum e publisher confirms (acessado por adaptador).
 - Micrometer — métricas de publicação.
-- Java 8 (piso) e Maven multi-módulo — plataforma e build; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no módulo, com adaptador fino para Spring Boot 3.x. Os demais domínios seguem em Java 21.
+- Java 8 (piso) e Maven multi-módulo — plataforma e build; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no módulo, com os adaptadores `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x), ambos com Java 17 como piso. Os demais domínios seguem em Java 21.
 
 **Dependências técnicas do domínio:**
 - Ambiente Docker com SQL Server e RabbitMQ (e Toxiproxy para testes) — sem ele o relay não é executável nem testável contra os recursos do SQL Server.
@@ -52,6 +54,8 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 **Objetivo de negócio:** garantir que cada mensagem recebida produza no máximo um efeito de negócio no consumidor, por meio de consumidor com ack manual, inbox gravada na transação local do efeito, dedup por `messageId`, retry/backoff, DLQ e métricas de consumo.
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §2 (16-26), §4 (36-47), §5.2 tabela `inbox` (73-91), §6.1 (95-106), RF-A6 a RF-A8, RF-A10 e RF-A11 (§7, 126-132), §9 (148-153), tarefa 2 (§12, 222), cenários A-F2 e A-F6 e "Ordem por agregado" (§11, 190-193, 207-209, 214-217). A serialização por chave e o comportamento da chave em falha vêm de decisão humana (`discovery-answers.md`, D10 e D11).
+
+**Estado de implementação:** não implementado; o módulo `mensageria-inbox` não existe e permanece escopo planejado do componente (`discovery-answers.md`, D14).
 
 **Dependências entre domínios:** nenhuma.
 
@@ -87,6 +91,8 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §5.1 (51-71), §6.2 (108-116), RF-A1 (§7, 122), cenários "Fluxo feliz" e "Falha na gravação do pagamento" (§11, 172-182).
 
+**Estado de implementação:** não implementado; o módulo `pagamentos` não existe. A demonstração `demooutboxinbox` é um produtor sobre o `mensageria-outbox-spring-boot4`, com outro evento (`MovimentoRegistrado`, publicado por `POST /movimentos/inclusao`), e não implementa este domínio.
+
 **Dependências entre domínios:** `mensageria-outbox` (outbox e relay).
 
 **Regras inferidas:**
@@ -97,7 +103,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 
 **Dependências externas relevantes:**
 - SQL Server em Docker — banco de Pagamentos (tabelas `pagamento` e `outbox`), escolhido porque o relay exige recursos que o H2 não tem; substitui o H2 em arquivo apenas neste domínio.
-- Spring Boot 3.x — framework da aplicação, com adaptador fino do `mensageria-outbox`.
+- Spring Boot 3.x — framework da aplicação, com o adaptador `mensageria-outbox-spring-boot3` do `mensageria-outbox`.
 - Java 21 e Maven.
 
 **Dependências técnicas do domínio:**
@@ -113,6 +119,8 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 **Objetivo de negócio:** consumir `PagamentoRecebido` e registrar o lançamento previsto no extrato do cooperado, exatamente uma vez por pagamento.
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §5.2 (73-91), RF-A6 a RF-A8 (§7, 126-129), cenários A-F2 e A-F6 e "Ordem por agregado" (§11, 190-193, 207-209, 214-217).
+
+**Estado de implementação:** não implementado; o módulo `extrato` não existe.
 
 **Dependências entre domínios:** `mensageria-inbox` (inbox, consumidor, retry/DLQ); `pagamentos` (contrato do evento `PagamentoRecebido`).
 
@@ -143,6 +151,8 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 **Objetivo de negócio:** verificar, de forma independente do fluxo, as invariantes A1 a A4 entre Pagamentos e Extrato ao final de todas as falhas injetadas.
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §10 (159-168), §13 (230-235), tarefa 6 (§12, 226).
+
+**Estado de implementação:** não implementado; o módulo `reconciliacao` não existe.
 
 **Dependências entre domínios:** `pagamentos` (lê `pagamento` e `outbox`); `extrato` (lê `extrato_lancamento`).
 

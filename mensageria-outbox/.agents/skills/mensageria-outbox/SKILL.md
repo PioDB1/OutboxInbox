@@ -24,6 +24,8 @@ A publicação é **at-least-once**: a mesma mensagem pode ser publicada mais de
 
 O módulo cobre: envelope, inserção na outbox, interface do relay e as duas estratégias, lease de relay único, publicação com confirms, retry/backoff de publicação, retenção da outbox e métricas de publicação.
 
+O código vive no artefato `br.com.db1.poc:mensageria-outbox-core` (pasta `mensageria-outbox/core/`, filho do POM `mensageria-outbox`). Uso pelo hospedeiro, parâmetros com os valores padrão, métricas e versões fixadas: `mensageria-outbox/README.md`.
+
 ## Fronteira do domínio
 
 - **Pertence a este domínio:** envelope, outbox, relay, lease, ponto de leitura, publicação no broker, retry de publicação, retenção, métricas de publicação e propagação de `correlationId`/`traceId` até a publicação.
@@ -80,7 +82,7 @@ Numeração própria desta skill (R1, R2, ...).
 ### Dialeto e portabilidade
 
 - **R20.** O acesso a banco é isolado por **dialeto**: SQL Server para a outbox, o lease e o relay (as duas estratégias dependem de `UPDLOCK`/`READPAST`/`ROWLOCK` e de `rowversion` com `min_active_rowversion()`, que o H2 não oferece). O relay não é executado sobre H2.
-- **R21.** O módulo **não depende de framework de aplicação**; cada framework entra por um adaptador fino, fora do módulo. O Spring Boot entra pelos módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`, um por linha do Spring Boot, com o Spring como dependência `provided` e o código comum em `mensageria-outbox-spring-boot-shared/`. A auto-configuração desses módulos grava na transação da aplicação, publica cada mensagem após o commit e recupera as pendentes na inicialização; ela preserva a ordem por `aggregateKey` de R11 (mensagens da mesma chave publicadas uma de cada vez, em ordem de `seq`, com a consulta de linhas anteriores pendentes por `READUNCOMMITTED`), não instancia o relay por polling (estratégias, lease, retenção e métricas), e a aplicação não usa os dois caminhos juntos, porque competiriam pelas mesmas linhas pendentes. Uso e comportamento: `mensageria-outbox-spring-boot3/README.md` e `mensageria-outbox-spring-boot4/README.md`.
+- **R21.** O módulo **não depende de framework de aplicação**; cada framework entra por um adaptador fino, fora do módulo. O Spring Boot entra pelos módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`, um por linha do Spring Boot, ambos com o `mensageria-outbox` como POM pai e dependentes do `mensageria-outbox-core`, com o Spring como dependência `provided` e o código comum em `mensageria-outbox-spring-boot-shared/`. A auto-configuração desses módulos grava na transação da aplicação, publica cada mensagem após o commit e recupera as pendentes na inicialização; ela preserva a ordem por `aggregateKey` de R11 (mensagens da mesma chave publicadas uma de cada vez, em ordem de `seq`, com a consulta de linhas anteriores pendentes por `READUNCOMMITTED`), não instancia o relay por polling (estratégias, lease, retenção e métricas), e a aplicação não usa os dois caminhos juntos, porque competiriam pelas mesmas linhas pendentes. Uso e comportamento: `mensageria-outbox-spring-boot3/README.md` e `mensageria-outbox-spring-boot4/README.md`.
 - **R22.** O módulo conhece o broker apenas por uma **interface de publicação**. Trocar de broker exige somente um novo adaptador. O adaptador RabbitMQ é o único que conhece detalhes do broker (filas quorum, publisher confirms).
 
 ### Retenção da outbox
@@ -181,7 +183,7 @@ A fila de destino é `quorum`, durável, declarada pela aplicação, com publish
 
 ## Parâmetros configuráveis
 
-Os parâmetros abaixo são configuráveis; nenhum valor padrão é definido pelas fontes e os valores são escolhidos e registrados na implementação:
+Os parâmetros abaixo são configuráveis; as fontes de negócio não definem valores padrão, e os adotados pela implementação estão na seção "Parâmetros `outbox.relay.*`" de `mensageria-outbox/README.md`:
 
 - relay habilitado somente quando o banco for o primário/ativo (liga/desliga o relay por instância);
 - estratégia de relay em uso (claim ou ponto de leitura);
@@ -204,7 +206,8 @@ As dependências técnicas e as precondições de ambiente do domínio estão em
 ## Pontos em aberto
 
 - A integração com Spring Boot do lado produtor vive em `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4` (R21). Se o restante do código da PoC é descartável ou evolui para uso em produção é uma pergunta sem decisão; não bloqueia o domínio, e o isolamento do módulo (sem framework de aplicação, broker por interface) o mantém reaproveitável.
-- A confirmação da semântica de `min_active_rowversion()` (R17) deve ser verificada na implementação. A compatibilidade de Micrometer e Testcontainers com a plataforma do módulo (Java 8 como piso) é verificada pela suíte do módulo nos JDKs 8, 11, 17, 21 e 25.
+- A confirmação da semântica de `min_active_rowversion()` (R17) vem de `MinActiveRowversionIT`, que exige Docker e grava as observações em `mensageria-outbox/core/target/min-active-rowversion-observations.txt` para o ADR 0001; sem essa execução registrada no ADR, R17 segue sem confirmação. A compatibilidade de Micrometer e Testcontainers com a plataforma do módulo (Java 8 como piso) é verificada pela suíte do módulo nos JDKs 8, 11, 17, 21 e 25.
+- Defeitos conhecidos do código, registrados sem correção, estão em `mensageria-outbox/.agents/context/pendencias.md`. Um deles contraria R12: linhas que falham sempre (por exemplo, `type` sem fila ligada) retêm a leitura do relay e deixam outras chaves sem publicação com o broker disponível.
 
 ## Manutenção
 

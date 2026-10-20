@@ -19,7 +19,6 @@
         <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
-            <version>5.37.0</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>

@@ -1,4 +1,5 @@
--- Esquema SQL Server da outbox, do lease e do ponto de leitura, usado pela biblioteca mensageria-outbox.
+-- Esquema SQL Server da outbox, do lease e do ponto de leitura, usado pela biblioteca mensageria-outbox, e da tabela
+-- de negócio movimento do demo (mesmas colunas da MovimentoEntity).
 -- Executado manualmente no banco da aplicação, antes de subir a aplicação, por exemplo:
 --   sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql
 -- Idempotente: cada objeto só é criado quando ainda não existe. Os lotes são separados por "GO", que o sqlcmd

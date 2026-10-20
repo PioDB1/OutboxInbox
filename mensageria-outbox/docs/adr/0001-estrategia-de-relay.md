@@ -38,7 +38,7 @@ Nenhuma estratégia está escolhida. O módulo mantém as duas implementações 
 
 ## Observações da PoC
 
-Nenhum número de desempenho é meta: os dados são observação para a decisão. Ambiente: SQL Server `mcr.microsoft.com/mssql/server:2019-CU32-ubuntu-20.04`, RabbitMQ `rabbitmq:4.3.6-management` atrás do Toxiproxy `2.10.0`, testes de integração do módulo `mensageria-outbox` executados com `mvn verify` e Docker.
+Nenhum número de desempenho é meta: os dados são observação para a decisão. Ambiente: SQL Server `mcr.microsoft.com/mssql/server:2019-CU32-ubuntu-20.04`, RabbitMQ `rabbitmq:4.3.6-management` atrás do Toxiproxy `2.10.0`, testes de integração do artefato `mensageria-outbox-core` executados com `mvn -pl mensageria-outbox/core verify` a partir da raiz, com Docker.
 
 ### Tamanho de cada estratégia
 
@@ -52,7 +52,7 @@ Contagem estática do código-fonte do módulo.
 
 ### Dados que dependem de execução com Docker
 
-Os valores abaixo não constam deste ADR; a coleta é trabalho posterior, em estação com Docker, e os números entram aqui antes de a decisão passar a `Aceito`. `RelayObservationsIT` acrescenta a `mensageria-outbox/target/relay-observations.txt`, para cada estratégia, os dados dos três primeiros itens, e `MinActiveRowversionIT` grava `mensageria-outbox/target/min-active-rowversion-observations.txt`:
+Os valores abaixo não constam deste ADR; a coleta é trabalho posterior, em estação com Docker, e os números entram aqui antes de a decisão passar a `Aceito`. `RelayObservationsIT` acrescenta a `mensageria-outbox/core/target/relay-observations.txt`, para cada estratégia, os dados dos três primeiros itens, e `MinActiveRowversionIT` grava `mensageria-outbox/core/target/min-active-rowversion-observations.txt`:
 
 - cenário de commits fora da ordem de `seq` (mensagem da transação aberta pulada ou não);
 - pico de pendentes e de lag, retries e tempo de recuperação em uma queda do broker com 50 linhas;

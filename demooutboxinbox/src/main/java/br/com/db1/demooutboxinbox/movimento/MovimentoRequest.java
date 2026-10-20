@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Corpo da requisição de {@code POST /movimentos}.
+ * Corpo da requisição de {@code POST /movimentos/inclusao} e {@code POST /movimentos/inclusao_sem_evento}.
  * <p>
  * {@code tipo} é {@link Character}: o JSON {@code null} chega como {@code null} à verificação
  * de presença, que o primitivo {@code char} receberia como {@code '\0'}.

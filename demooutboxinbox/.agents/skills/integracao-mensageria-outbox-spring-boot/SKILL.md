@@ -14,7 +14,7 @@ metadata:
 
 ## Visão geral do padrão
 
-A biblioteca `br.com.db1.poc:mensageria-outbox:0.1.0-SNAPSHOT` não depende de framework. A integração com o Spring Boot é o artefato `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT`, mantido no repositório (`../mensageria-outbox-spring-boot4`, com o código comum em `../mensageria-outbox-spring-boot-shared`). Ao entrar no classpath, a auto-configuração `br.com.db1.poc.outbox.spring.OutboxAutoConfiguration` registra tudo o que a outbox precisa:
+A biblioteca `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` (pasta `../mensageria-outbox/core`) não depende de framework. A integração com o Spring Boot é o artefato `br.com.db1.poc:mensageria-outbox-spring-boot4:0.3.0-SNAPSHOT`, mantido no repositório (`../mensageria-outbox-spring-boot4`, com o código comum em `../mensageria-outbox-spring-boot-shared`). Ao entrar no classpath, a auto-configuração `br.com.db1.poc.outbox.spring.OutboxAutoConfiguration` registra tudo o que a outbox precisa:
 
 1. **Fábrica do RabbitMQ e exchange:** o bean `outboxRabbitConnectionFactory`, preenchido por `spring.rabbitmq.*` com recuperação automática ligada, e o `RabbitMessagePublisher` com confirms, que declara o exchange na inicialização.
 2. **Gravação na transação:** o `OutboxGravador.gravar(envelope)` grava a linha da outbox na conexão JDBC da transação Spring em curso.
@@ -25,23 +25,22 @@ O demo não tem código de integração próprio: ele declara a fila de cada eve
 
 As tabelas da outbox são criadas fora da aplicação, pelo script `sql/outbox.sql` executado manualmente no banco; a auto-configuração nunca chama o `OutboxSchemaInstaller`.
 
-O fluxo de referência é o diagrama `../mensageria-outbox/Outbox-Assync.puml`. O relay por polling da biblioteca (`RelayFactory`, `ClaimRelay`, `ReadPointRelay`, estratégias `claim`/`read-point`) não é instanciado. A garantia é **at-least-once**: a mesma mensagem pode ser publicada mais de uma vez (queda entre o confirm e a marcação de `sent_at`, ou envio após o commit concorrendo com a recuperação).
+O fluxo de referência é o diagrama `../mensageria-outbox/Outbox-Assync.puml`. O relay por polling da biblioteca (`RelayFactory`, `ClaimRelay`, `ReadPointRelay`, estratégias `claim`/`read-point`) não é instanciado. A garantia é **at-least-once**: a mesma mensagem pode ser publicada mais de uma vez (queda ou falha entre o confirm e a marcação de `sent_at`, ou mais de uma instância da aplicação sobre o mesmo banco). Em uma única instância, a linha entregue ao despachante pelo envio após o commit e pela recuperação é publicada uma vez.
 
 ## Como aplicar
 
 ### 1. Dependências e configuração
 
-- O `pom.xml` declara `spring-boot-starter-data-jpa`, `spring-boot-starter-amqp`, `mssql-jdbc` e `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT`, que traz o `mensageria-outbox`. O artefato declara o Spring como `provided`: valem as versões do Spring Boot 4.1.1 do demo.
+- O `pom.xml` declara `spring-boot-starter-data-jpa`, `spring-boot-starter-amqp`, `mssql-jdbc` e `br.com.db1.poc:mensageria-outbox-spring-boot4:0.3.0-SNAPSHOT`, que traz o `mensageria-outbox-core`. O artefato declara o Spring como `provided`: valem as versões do Spring Boot 4.1.1 do demo.
 - Os artefatos `br.com.db1.poc` são resolvidos do repositório `JFrog-Sisprime` quando publicados; localmente, vêm do `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` executado na raiz do repositório.
 - O `amqp-client` é fixado em 5.37.0 pela propriedade `rabbit-amqp-client.version` do `pom.xml`, a versão com que a biblioteca é construída e testada. Sem a propriedade, o `spring-boot-starter-parent` 4.1.1 resolve a 5.30.0.
 - O `DataSource` é o auto-configurado pelo Spring Boot (`spring.datasource.*`); a transação é a do `JpaTransactionManager` auto-configurado.
 - A configuração fica em `src/main/resources/application.properties`. Credenciais chegam por variáveis de ambiente (as de `../compose.yaml`: `MSSQL_SA_PASSWORD`, `MSSQL_PORT`, `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_AMQP_PORT`) referenciadas por placeholders, nunca por valores literais. `spring.rabbitmq.*` configura tanto o Spring AMQP quanto o `outboxRabbitConnectionFactory`.
 - O `application.properties` importa o `.env` da raiz do repositório como fonte de configuração, com `spring.config.import=optional:file:../.env[.properties]`; o arquivo é lido no formato `.properties`. As variáveis de ambiente do processo têm precedência sobre os valores do `.env`. O caminho `../.env` é relativo ao diretório de trabalho: executada a partir de outro diretório (por exemplo, pela IDE), a aplicação não encontra o arquivo e depende das variáveis exportadas no ambiente.
-- Os parâmetros de publicação usam as chaves `outbox.relay.*`, declaradas no `application.properties` com os padrões do artefato:
+- Os parâmetros de publicação usam as chaves `outbox.relay.*`, declaradas no `application.properties` com os padrões do artefato. O `application.properties` também declara `outbox.relay.enabled=false`, que registra a decisão de não usar o relay por polling; a auto-configuração não lê essa chave, porque nunca instancia o relay.
 
 | Chave | Padrão | Uso |
 |---|---|---|
-| `enabled` | `false` | declarada explicitamente como `false`; o relay por polling da biblioteca fica desligado |
 | `exchange` | `mensageria.outbox` | exchange declarado na inicialização e usado pelo `RabbitMessagePublisher` |
 | `confirm-timeout` | `5s` | espera pelo confirm de cada publicação |
 | `backoff.initial` | `200ms` | primeiro intervalo de reenvio de uma mensagem |
@@ -51,7 +50,7 @@ O fluxo de referência é o diagrama `../mensageria-outbox/Outbox-Assync.puml`. 
 
 ### 2. Esquema das tabelas
 
-- As tabelas `outbox`, `outbox_lease` e `outbox_read_point` e os índices da `outbox` são criados pelo script `sql/outbox.sql`, executado manualmente no banco da aplicação antes de subi-la (por exemplo, `sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql`). O script é idempotente e separa os lotes com `GO`, interpretado pelo `sqlcmd` e pelo SSMS.
+- As tabelas `outbox`, `outbox_lease` e `outbox_read_point` e os índices da `outbox` são criados pelo script `sql/outbox.sql`, executado manualmente no banco da aplicação antes de subi-la (por exemplo, `sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql`). O script é idempotente e separa os lotes com `GO`, interpretado pelo `sqlcmd` e pelo SSMS. O mesmo script também cria a tabela de negócio `movimento` do demo.
 - O script tem a mesma estrutura do `schema.sql` da biblioteca, que o `SqlServerOutboxDialect` lê e escreve. Uma nova versão da biblioteca com outro `schema.sql` exige atualizar o script na mesma mudança.
 - Não há Flyway nem Liquibase. As tabelas da outbox não são entidades JPA: são lidas e escritas somente pela API da biblioteca, e o `ddl-auto=update` do Hibernate não as toca.
 
@@ -101,8 +100,8 @@ public void registrar(...) {
 ## Ferramentas e artefatos envolvidos
 
 - Artefato `mensageria-outbox-spring-boot4`: uso e comportamento em `../mensageria-outbox-spring-boot4/README.md`; código comum em `../mensageria-outbox-spring-boot-shared/src/main/java/br/com/db1/poc/outbox/spring/` (`OutboxAutoConfiguration`, `OutboxRelayProperties`, `OutboxGravador`, `OutboxGravada`, `OutboxDespachante`, `OutboxRecuperacao`); `OutboxRabbitConnectionFactoryConfiguration` em `../mensageria-outbox-spring-boot4/src/main/java/`.
-- Biblioteca `mensageria-outbox` (fonte em `../mensageria-outbox/src/main/java/br/com/db1/poc/outbox/`): `envelope.Envelope`, `rabbit.RabbitTopology`, `rabbit.RabbitMessagePublisher` e, por dentro do artefato, `write.OutboxWriter` e `dialect.sqlserver.SqlServerOutboxDialect`.
-- Fluxo de disparo assíncrono: `../mensageria-outbox/Outbox-Assync.puml`. Esquema SQL: script `sql/outbox.sql` do demo, com a estrutura de `../mensageria-outbox/src/main/resources/br/com/db1/poc/outbox/schema/sqlserver/schema.sql`.
+- Biblioteca `mensageria-outbox-core` (fonte em `../mensageria-outbox/core/src/main/java/br/com/db1/poc/outbox/`): `envelope.Envelope`, `rabbit.RabbitTopology`, `rabbit.RabbitMessagePublisher` e, por dentro do artefato, `write.OutboxWriter` e `dialect.sqlserver.SqlServerOutboxDialect`.
+- Fluxo de disparo assíncrono: `../mensageria-outbox/Outbox-Assync.puml`. Esquema SQL: script `sql/outbox.sql` do demo, com a estrutura de `../mensageria-outbox/core/src/main/resources/br/com/db1/poc/outbox/schema/sqlserver/schema.sql`.
 - Código do demo que usa a outbox: `MovimentoService` (gravação de `MovimentoRegistrado`) e `MovimentoMensageriaConfiguration` (fila `movimentos.movimento-registrado`).
 - SLF4J com MDC para os logs de publicação; o padrão de log da aplicação (`logging.pattern.level`) inclui `%X{messageId}`, `%X{correlationId}`, `%X{aggregateKey}` e `%X{traceId}`.
 - Ambiente local: `../compose.yaml` (SQL Server e RabbitMQ), com credenciais no `../.env`, não versionado.
@@ -111,7 +110,7 @@ public void registrar(...) {
 
 - **Broker na inicialização.** O exchange é declarado durante a criação dos beans: sem RabbitMQ acessível, a aplicação não sobe.
 - **Tabelas ausentes.** Sem o `sql/outbox.sql` executado, a aplicação sobe, toda gravação na outbox falha e desfaz a transação do dado de negócio, e a recuperação registra um erro ao ler os pendentes.
-- **Duplicidade é esperada.** O envio após o commit e a recuperação podem publicar a mesma linha, assim como uma queda entre o confirm e a marcação de `sent_at`. O consumidor deduplica pelo `messageId`.
+- **Duplicidade é esperada.** Uma queda ou falha entre o confirm e a marcação de `sent_at`, ou mais de uma instância da aplicação sobre o mesmo banco, publicam a mesma linha mais de uma vez. O consumidor deduplica pelo `messageId`.
 - **Chave retida.** Uma linha pendente anterior retém as mensagens posteriores do mesmo `aggregateKey` enquanto existir: uma transação longa ainda aberta, ou uma linha confirmada cuja marcação de `sent_at` falhou, seguram a chave até o commit ou rollback, ou até a recuperação da próxima inicialização.
 - **Fila obrigatória.** A publicação usa `mandatory=true`: sem fila ligada à routing key, o broker devolve a mensagem e o reenvio se repete indefinidamente.
 - **Evento fora de transação.** O envio após o commit depende de `@TransactionalEventListener`; `gravar` fora de transação é recusado.

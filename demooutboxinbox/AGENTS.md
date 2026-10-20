@@ -4,9 +4,9 @@
 
 O `demooutboxinbox` é uma POC de demonstração do lado produtor do padrão outbox. Uma aplicação Spring Boot recebe a solicitação de pagamento, registra o `pagamento` e grava a mensagem `PagamentoRecebido` na tabela `outbox` na mesma transação local, de modo que o pagamento e a mensagem existam juntos ou não existam. A publicação no RabbitMQ é disparada de forma assíncrona após o commit.
 
-- **Domínio único:** Pagamentos, produtor de `PagamentoRecebido` e de `MovimentoRegistrado` (publicado a cada `POST /movimentos`).
+- **Domínio único:** Pagamentos, produtor de `PagamentoRecebido` e de `MovimentoRegistrado` (publicado a cada `POST /movimentos/inclusao`; `POST /movimentos/inclusao_sem_evento` grava a movimentação sem evento). A inclusão de movimentação está implementada; o registro de pagamento (`POST /pagamentos`, tabela `pagamento`, `PagamentoRecebido`) é escopo descrito na skill do domínio, a implementar por spec.
 - **Fora do escopo:** consumo de mensagens e inbox (Extrato, deduplicação, ack manual, retry/DLQ do consumidor) e reconciliação das invariantes A1 a A4. Não há consumidor no demo: a mensagem publicada fica na fila do broker.
-- **Mecânica de outbox:** biblioteca `br.com.db1.poc:mensageria-outbox:0.1.0-SNAPSHOT` (projeto irmão `../mensageria-outbox`), integrada ao Spring Boot pelo artefato `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT` (módulo irmão `../mensageria-outbox-spring-boot4`).
+- **Mecânica de outbox:** biblioteca `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` (projeto irmão `../mensageria-outbox`, módulo `core`), integrada ao Spring Boot pelo artefato `br.com.db1.poc:mensageria-outbox-spring-boot4:0.3.0-SNAPSHOT` (módulo irmão `../mensageria-outbox-spring-boot4`, com o código comum em `../mensageria-outbox-spring-boot-shared`).
 - **Referências de negócio:** `../mensageria-outbox/spec-caso-a-outbox-inbox.md` (Caso A: §5.1, §6.2 e RF-A1), `../mensageria-outbox/README.md` (contrato de uso da biblioteca pelo hospedeiro) e `../mensageria-outbox/Outbox-Assync.puml` (fluxo de disparo assíncrono).
 
 ## Stack
@@ -29,23 +29,23 @@ O `demooutboxinbox` é uma POC de demonstração do lado produtor do padrão out
 demooutboxinbox/
 ├── pom.xml                        # build Maven, dependências e repositório JFrog-Sisprime
 ├── mvnw, mvnw.cmd, .mvn/wrapper/  # Maven Wrapper
-├── sql/outbox.sql                 # DDL das tabelas da outbox, executado manualmente no banco
+├── sql/outbox.sql                 # DDL das tabelas da outbox e da tabela movimento, executado manualmente no banco
 ├── src/main/java/br/com/db1/demooutboxinbox/   # código da aplicação (pacote base)
 ├── src/main/resources/application.properties  # configuração da aplicação
 ├── src/test/java/br/com/db1/demooutboxinbox/   # teste de scaffold contextLoads
 └── .agents/                       # contexto, mapas e skills para agentes
 ```
 
-O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) contém o `compose.yaml` do ambiente local, o agregador Maven, a biblioteca `mensageria-outbox` e os módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`.
+O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) contém o `compose.yaml` do ambiente local, o agregador Maven, a biblioteca `mensageria-outbox`, os módulos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4` e o código comum `mensageria-outbox-spring-boot-shared`. Cada uma dessas pastas tem o próprio `AGENTS.md` e o próprio `.agents/`, com as skills do seu escopo; uma alteração no componente é especificada e implementada a partir da pasta que a contém.
 
 ## Convenções de arquitetura
 
 - Uma única aplicação com um único banco SQL Server, que contém `pagamento`, `movimento` e as tabelas da outbox (`outbox`, `outbox_lease` e `outbox_read_point`).
 - A integração com a `mensageria-outbox` vem da auto-configuração do `mensageria-outbox-spring-boot4`; o demo não tem código de integração próprio. Cada domínio declara a fila dos eventos que publica e grava a mensagem com `OutboxGravador.gravar(envelope)` dentro da transação do dado de negócio.
 - O `OutboxWriter` grava na mesma conexão JDBC da transação JPA do `pagamento` (`autoCommit=false`); commit, rollback e fechamento da conexão são responsabilidade da aplicação.
-- As tabelas das entidades JPA, como `movimento`, são criadas pelo Hibernate na inicialização, com `spring.jpa.hibernate.ddl-auto=update`: a tabela ausente é criada e a existente é mantida com os dados. O mapeamento de cada entidade declara nome, tipo e tamanho de todas as colunas iguais aos da tabela, porque o `update` altera a coluna divergente e, no SQL Server, a deixa anulável.
-- As tabelas da outbox não são entidades JPA e são criadas pelo script `sql/outbox.sql`, idempotente, executado manualmente no banco antes de subir a aplicação. O script tem a mesma estrutura do `schema.sql` da biblioteca; a aplicação não chama o `OutboxSchemaInstaller`. Não há ferramenta de migração nem evolução versionada do esquema (sem Flyway ou Liquibase); a estrutura de `pagamento` é fixa.
-- A publicação ocorre por disparo assíncrono após o commit, com recuperação das linhas pendentes (`sent_at` nulo) na inicialização. O relay por polling da biblioteca (`RelayFactory`, estratégias `claim`/`read-point`) fica desligado com `outbox.relay.enabled=false`.
+- O script `sql/outbox.sql`, idempotente, é executado manualmente no banco antes de subir a aplicação e cria as tabelas da outbox (`outbox`, `outbox_lease` e `outbox_read_point`) e a tabela `movimento`, cada uma só quando ainda não existe. As tabelas da outbox não são entidades JPA e têm a mesma estrutura do `schema.sql` da biblioteca; a aplicação não chama o `OutboxSchemaInstaller`. A `movimento` é criada em `master.dbo`, com as colunas da `MovimentoEntity` e a restrição de verificação de `tipo` (`E` ou `S`).
+- O Hibernate roda com `spring.jpa.hibernate.ddl-auto=update`: cria na inicialização a tabela de entidade JPA ainda ausente (como a `movimento`, quando o script não foi executado) e mantém a existente com os dados. O mapeamento de cada entidade declara nome, tipo e tamanho de todas as colunas iguais aos da tabela, porque o `update` altera a coluna divergente e, no SQL Server, a deixa anulável; uma mudança na `MovimentoEntity` é acompanhada da mesma mudança no `sql/outbox.sql`. Não há ferramenta de migração nem evolução versionada do esquema (sem Flyway ou Liquibase); a estrutura de `pagamento` é fixa.
+- A publicação ocorre por disparo assíncrono após o commit, com recuperação das linhas pendentes (`sent_at` nulo) na inicialização. O relay por polling da biblioteca (`RelayFactory`, estratégias `claim`/`read-point`) não é usado: a auto-configuração nunca o instancia, e o `outbox.relay.enabled=false` do `application.properties` apenas registra essa decisão.
 - A publicação é at-least-once: uma mensagem pode ser publicada mais de uma vez.
 - Os logs de publicação incluem as chaves de MDC `messageId`, `correlationId`, `aggregateKey` e `traceId`.
 - A configuração da aplicação fica em `src/main/resources/application.properties`.
@@ -53,7 +53,7 @@ O projeto vive dentro do repositório `outbox-inbox-poc`, cuja raiz (`..`) cont�
 
 ## Restrições globais
 
-- Os artefatos `mensageria-outbox-spring-boot4` e `mensageria-outbox` 0.1.0-SNAPSHOT são resolvidos do repositório `JFrog-Sisprime` (`https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/`), declarado no `pom.xml`, ou do repositório Maven local depois de `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` na raiz do repositório.
+- Os artefatos `mensageria-outbox-spring-boot4` e `mensageria-outbox-core` 0.3.0-SNAPSHOT são resolvidos do repositório `JFrog-Sisprime` (`https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/`), declarado no `pom.xml`, ou do repositório Maven local depois de `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` na raiz do repositório.
 - O projeto é independente do agregador Maven da raiz (`../pom.xml`), que lista os módulos `mensageria-outbox`, `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`; o build do demo roda a partir desta pasta, com o wrapper próprio.
 - Credenciais de banco e broker chegam por variáveis de ambiente ou pelo arquivo `.env` da raiz do repositório e nunca são versionadas (o `.env` está no `../.gitignore`). As variáveis exigidas são as referenciadas em `../compose.yaml`.
 - Não há testes unitários nem de integração além do teste de scaffold `contextLoads`, que sobe o contexto completo e exige SQL Server e RabbitMQ disponíveis.
@@ -67,7 +67,7 @@ Execute a partir desta pasta (`demooutboxinbox/`), exceto quando indicado. No Wi
 |---|---|
 | Subir SQL Server e RabbitMQ locais (na raiz do repositório, `..`) | `docker compose up -d` |
 | Instalar no repositório Maven local o `mensageria-outbox` e os artefatos Spring Boot (na raiz do repositório, `..`, com Maven e JDK 21) | `mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install` |
-| Criar as tabelas da outbox no banco local (idempotente; a senha do `sa` vem do `.env`) | `sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql` |
+| Criar as tabelas da outbox e a `movimento` no banco local (idempotente; a senha do `sa` vem do `.env`) | `sqlcmd -S localhost,1433 -U sa -d master -i sql/outbox.sql` |
 | Compilar | `./mvnw compile` |
 | Executar a aplicação | `./mvnw spring-boot:run` |
 | Abrir o Swagger UI (com a aplicação no ar) | `http://localhost:8081/swagger-ui.html` (especificação OpenAPI em `http://localhost:8081/v3/api-docs`) |

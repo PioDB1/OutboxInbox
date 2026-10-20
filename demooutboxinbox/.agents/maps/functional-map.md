@@ -17,10 +17,13 @@ A mecânica de outbox vem da biblioteca `mensageria-outbox` e entra pela auto-co
 **Objetivo de negócio:** receber a solicitação de pagamento, registrá-lo e publicar o fato `PagamentoRecebido`, de modo que o pagamento e a mensagem existam juntos ou não existam.
 
 **Evidência no código:**
-- `pom.xml` — dependência `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT`, `spring-boot-starter-webmvc` (endpoint de solicitação), `spring-boot-starter-amqp`, `spring-boot-starter-actuator` e `mssql-jdbc`.
+- `pom.xml` — dependência `br.com.db1.poc:mensageria-outbox-spring-boot4:0.3.0-SNAPSHOT`, `spring-boot-starter-webmvc` (endpoints de movimentação), `spring-boot-starter-amqp`, `spring-boot-starter-actuator` e `mssql-jdbc`.
 - `../compose.yaml` — cabeçalho "Ambiente local do relay de Pagamentos".
 - `../mensageria-outbox/README.md` — exemplo de uso do hospedeiro com o tipo `PagamentoRecebido` e o exchange `mensageria.outbox`.
 - `../mensageria-outbox/Outbox-Assync.puml` — fluxo de disparo assíncrono após a gravação e de reenvio dos pendentes na inicialização.
+- `src/main/java/br/com/db1/demooutboxinbox/movimento/` — `POST /movimentos/inclusao` (movimentação e `MovimentoRegistrado` na mesma transação) e `POST /movimentos/inclusao_sem_evento` (só a movimentação), com a fila `movimentos.movimento-registrado` declarada na inicialização.
+
+**Estado da implementação:** a inclusão de movimentação está implementada. O registro de pagamento (`POST /pagamentos`, tabela `pagamento`, evento `PagamentoRecebido` e fila `pagamentos.pagamento-recebido`) é escopo do domínio descrito na skill, sem código, a implementar por spec.
 
 **Evidência na fonte externa:** `../mensageria-outbox/spec-caso-a-outbox-inbox.md` — §5.1 (tabelas `pagamento` e `outbox`), §6.2 (contrato `PagamentoRecebido` v1), RF-A1 e cenários "Fluxo feliz" e "Falha na gravação do pagamento" (§11).
 
@@ -30,16 +33,16 @@ A mecânica de outbox vem da biblioteca `mensageria-outbox` e entra pela auto-co
 - `pagamento` e a linha da `outbox` são gravados na mesma transação local JPA, no único banco SQL Server da aplicação; falha na transação não deixa nenhum dos dois.
 - Status inicial `RECEBIDO`; valor com duas casas decimais; `cooperadoId` numérico.
 - `PagamentoRecebido` v1 carrega `pagamentoId`, `cooperadoId` e `valor`, com `pagamentoId` como `aggregateKey`; a publicação usa routing key igual ao `type`.
-- `POST /movimentos` grava a movimentação e a mensagem `MovimentoRegistrado` v1 (`movimentoId` e `tipo`, com o `id` da movimentação como `aggregateKey`) na mesma transação, publicada na fila `movimentos.movimento-registrado`.
+- `POST /movimentos/inclusao` grava a movimentação e a mensagem `MovimentoRegistrado` v1 (`movimentoId` e `tipo`, com o `id` da movimentação como `aggregateKey`) na mesma transação, publicada na fila `movimentos.movimento-registrado`; `POST /movimentos/inclusao_sem_evento` grava só a movimentação.
 - Depois do commit, a aplicação dispara a publicação de forma assíncrona; a mensagem só é considerada enviada depois do confirm do broker, quando a linha da outbox recebe `sent_at`. Até o confirm, o envio é repetido.
 - Na inicialização, a aplicação consulta as linhas pendentes da outbox (`sent_at` nulo) e as enfileira para o mesmo envio assíncrono, cobrindo publicações interrompidas por queda da aplicação ou do broker.
 - Publicação at-least-once: a mesma mensagem pode ser publicada mais de uma vez (por exemplo, queda entre o confirm e a marcação de `sent_at`).
 - Não há consumidor no demo: a mensagem publicada fica na fila do broker.
 
 **Dependências externas relevantes:**
-- `mensageria-outbox-spring-boot4` (0.1.0-SNAPSHOT, repositório `JFrog-Sisprime`) — auto-configuração com `OutboxGravador`, envio após o commit e recuperação dos pendentes, sobre o `mensageria-outbox` (`Envelope`, `OutboxWriter`, `SqlServerOutboxDialect`, `RabbitMessagePublisher` e `RabbitTopology`). O relay por polling (`RelayFactory`, estratégias `claim` e `read-point`) não é usado; a publicação segue o disparo assíncrono do `Outbox-Assync.puml`, com `outbox.relay.enabled=false`.
+- `mensageria-outbox-spring-boot4` (0.3.0-SNAPSHOT, repositório `JFrog-Sisprime` ou Maven local) — auto-configuração com `OutboxGravador`, envio após o commit e recuperação dos pendentes, sobre o `mensageria-outbox-core` (`Envelope`, `OutboxWriter`, `SqlServerOutboxDialect`, `RabbitMessagePublisher` e `RabbitTopology`). O relay por polling (`RelayFactory`, estratégias `claim` e `read-point`) não é usado; a publicação segue o disparo assíncrono do `Outbox-Assync.puml`, com `outbox.relay.enabled=false`.
 - Spring Data JPA (Hibernate), pelo `spring-boot-starter-data-jpa` — persistência do `pagamento` e transação local compartilhada com o `OutboxWriter`.
-- SQL Server (`mssql-jdbc`) — banco único com `pagamento`, `outbox`, `outbox_lease` e `outbox_read_point`, estas três criadas pelo script manual `sql/outbox.sql`; sem ferramenta de migração (sem Flyway ou Liquibase).
+- SQL Server (`mssql-jdbc`) — banco único com `pagamento`, `movimento`, `outbox`, `outbox_lease` e `outbox_read_point`, as quatro últimas criadas pelo script manual `sql/outbox.sql` (a `movimento` também pelo Hibernate, quando o script não foi executado); sem ferramenta de migração (sem Flyway ou Liquibase).
 - RabbitMQ (`amqp-client` 5.37.0, fixado no `pom.xml`; `spring-boot-starter-amqp`) — publisher confirms, exchange `direct` `mensageria.outbox`.
 - Spring Boot 4.1.1 (`spring-boot-starter-webmvc`, `spring-boot-starter-actuator`) e Micrometer.
 

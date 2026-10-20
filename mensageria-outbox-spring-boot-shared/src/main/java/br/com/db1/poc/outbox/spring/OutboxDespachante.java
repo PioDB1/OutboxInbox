@@ -38,7 +38,7 @@ import br.com.db1.poc.outbox.relay.BackoffPolicy;
  * positivo do broker e da marcação de {@code sent_at} da anterior. Uma mensagem em falha retém as posteriores da
  * mesma chave; as demais chaves seguem.
  * <p>
- * Antes de publicar a primeira mensagem conhecida de uma chave, o despachante consulta o banco com
+ * Antes de cada tentativa de publicação, o despachante consulta o banco com
  * {@link OutboxDialect#hasPendingBetween} ({@code READUNCOMMITTED}): uma linha pendente anterior da mesma chave que
  * ele ainda não recebeu (transação ainda não confirmada, ou linha de uma execução anterior que a recuperação ainda
  * não leu) retém a chave até chegar ao despachante ou deixar de existir. A mesma consulta descarta a linha que já

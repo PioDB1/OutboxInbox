@@ -22,6 +22,9 @@
         <!-- Variantes com bytecode Java 8 do driver e do Logback; a raiz fixa as de Java 11. -->
         <mssql-jdbc.version>13.4.0.jre8</mssql-jdbc.version>
         <logback.version>1.3.16</logback.version>
+        <!-- Versão com que a biblioteca é construída e testada; gerenciada aqui para prevalecer sobre a do
+             spring-boot-dependencies importado pelos módulos mensageria-outbox-spring-boot*. -->
+        <amqp-client.version>5.37.0</amqp-client.version>
         <extra-enforcer-rules.version>1.12.1</extra-enforcer-rules.version>
         <!-- Limites explícitos de heap e de memória direta dos testes de integração (R26). -->
         <failsafe.argLine>-Xmx256m -XX:MaxDirectMemorySize=64m</failsafe.argLine>
@@ -32,6 +35,16 @@
     <modules>
         <module>core</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.rabbitmq</groupId>
+                <artifactId>amqp-client</artifactId>
+                <version>${amqp-client.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>

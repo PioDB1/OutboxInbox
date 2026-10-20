@@ -4,10 +4,11 @@ Auto-configuração da biblioteca [`mensageria-outbox`](../mensageria-outbox/REA
 
 | | |
 |---|---|
-| Coordenadas | `br.com.db1.poc:mensageria-outbox-spring-boot4:0.1.0-SNAPSHOT` |
+| Coordenadas | `br.com.db1.poc:mensageria-outbox-spring-boot4:0.3.0-SNAPSHOT` |
 | Linha do Spring Boot | 4.x (compilado e testado com 4.1.1) |
 | Java (piso) | 17 (`--release 17`) |
-| Dependência de compilação | `mensageria-outbox` (traz `com.rabbitmq:amqp-client` 5.37.0) |
+| Dependência de compilação | `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` (traz `com.rabbitmq:amqp-client` 5.37.0) |
+| POM pai | `br.com.db1.poc:mensageria-outbox:0.3.0-SNAPSHOT`, que fixa o `amqp-client` 5.37.0 sobre a versão do BOM do Spring Boot e verifica o bytecode (piso 17) |
 | Dependências `provided` | `spring-boot-autoconfigure`, `spring-boot-starter-amqp`, `spring-boot-starter-jdbc` |
 
 O Spring fica como `provided`: em execução vale a versão do Spring Boot 4.x da aplicação, que declara os starters `amqp` e `jdbc` (ou `data-jpa`) e o driver do SQL Server. Para aplicações Spring Boot 3.x, o artefato é o `mensageria-outbox-spring-boot3`.
@@ -25,7 +26,7 @@ O Spring fica como `provided`: em execução vale a versão do Spring Boot 4.x d
 <dependency>
     <groupId>br.com.db1.poc</groupId>
     <artifactId>mensageria-outbox-spring-boot4</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -48,7 +49,7 @@ As demais chaves `outbox.relay.*` da biblioteca (`enabled`, `strategy`, `lease.*
 
 ### Esquema
 
-As tabelas `outbox`, `outbox_lease` e `outbox_read_point` são criadas por script DDL executado no banco antes de subir a aplicação, com a mesma estrutura do `schema.sql` da biblioteca (`mensageria-outbox/src/main/resources/br/com/db1/poc/outbox/schema/sqlserver/schema.sql`). A auto-configuração não chama o `OutboxSchemaInstaller`.
+As tabelas `outbox`, `outbox_lease` e `outbox_read_point` são criadas por script DDL executado no banco antes de subir a aplicação, com a mesma estrutura do `schema.sql` da biblioteca (`mensageria-outbox/core/src/main/resources/br/com/db1/poc/outbox/schema/sqlserver/schema.sql`). A auto-configuração não chama o `OutboxSchemaInstaller`.
 
 ### Filas
 
@@ -116,4 +117,4 @@ O código comum às duas linhas do Spring Boot (pacote `br.com.db1.poc.outbox.sp
 mvn -pl mensageria-outbox-spring-boot3,mensageria-outbox-spring-boot4 -am install   # a partir da raiz, em JDK 21
 ```
 
-`OutboxAutoConfigurationTest` verifica a auto-configuração com `ApplicationContextRunner`, sem banco nem broker. A aplicação de demonstração `demooutboxinbox` (Spring Boot 4.1.1, JPA) consome este artefato e foi validada de ponta a ponta contra SQL Server e RabbitMQ locais.
+`OutboxAutoConfigurationTest` verifica a auto-configuração com `ApplicationContextRunner` e `OutboxDespachanteTest` verifica o envio após o commit, a ordem por `aggregateKey` e a falha na marcação de `sent_at`, ambos sem banco nem broker. A aplicação de demonstração `demooutboxinbox` (Spring Boot 4.1.1, JPA) consome este artefato e foi validada de ponta a ponta contra SQL Server e RabbitMQ locais.

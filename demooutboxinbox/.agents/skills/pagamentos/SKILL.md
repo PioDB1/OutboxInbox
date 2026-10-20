@@ -1,6 +1,6 @@
 ---
 name: pagamentos
-description: Esta é a documentação autoritativa do domínio Pagamentos, fonte da verdade sobre a solicitação e o registro de pagamento, a inclusão de movimento e a publicação dos eventos PagamentoRecebido e MovimentoRegistrado. Use ao implementar, alterar ou revisar o endpoint POST /pagamentos, a tabela pagamento, a tabela movimento e a MovimentoEntity, o endpoint POST /movimentos e seu parâmetro forcarFalha, o status RECEBIDO, cooperadoId, valor, os contratos PagamentoRecebido v1 e MovimentoRegistrado v1, a fila movimentos.movimento-registrado, o envelope da mensagem, a gravação atômica de pagamento e outbox e a publicação at-least-once no RabbitMQ.
+description: Esta é a documentação autoritativa do domínio Pagamentos, fonte da verdade sobre a solicitação e o registro de pagamento, a inclusão de movimento e a publicação dos eventos PagamentoRecebido e MovimentoRegistrado. Use ao implementar, alterar ou revisar o endpoint POST /pagamentos, a tabela pagamento, a tabela movimento e a MovimentoEntity, os endpoints POST /movimentos/inclusao e POST /movimentos/inclusao_sem_evento e o parâmetro forcarFalha, o status RECEBIDO, cooperadoId, valor, os contratos PagamentoRecebido v1 e MovimentoRegistrado v1, a fila movimentos.movimento-registrado, o envelope da mensagem, a gravação atômica de pagamento e outbox e a publicação at-least-once no RabbitMQ.
 metadata:
   author: clovis-cli
   type: domain-skill
@@ -16,7 +16,9 @@ metadata:
 
 Pagamentos recebe a solicitação de pagamento de um cooperado, registra o pagamento e publica o fato `PagamentoRecebido` para outros sistemas. O problema de negócio resolvido é a **entrega atômica**: o pagamento registrado e a mensagem que o anuncia existem juntos ou não existem, usando apenas a transação local do banco da aplicação, sem transação distribuída entre banco e broker.
 
-A inclusão de movimentação segue o mesmo padrão: a movimentação gravada e a mensagem `MovimentoRegistrado` que a anuncia existem juntas ou não existem.
+A inclusão de movimentação com evento segue o mesmo padrão: a movimentação gravada e a mensagem `MovimentoRegistrado` que a anuncia existem juntas ou não existem. A inclusão sem evento grava só a movimentação, sem mensagem.
+
+O registro de pagamento — `POST /pagamentos`, a tabela `pagamento` e o evento `PagamentoRecebido` — é escopo do domínio a implementar por spec: a aplicação implementa a inclusão de movimentação. As regras de pagamento abaixo valem para essa implementação.
 
 O domínio é o lado produtor do padrão outbox. Não existe consumidor da mensagem nesta aplicação: o evento publicado permanece na fila do broker. Consumo, deduplicação no consumidor (inbox), lançamento em extrato e reconciliação de invariantes estão fora do domínio.
 
@@ -126,7 +128,7 @@ CREATE TABLE pagamento (
 
 ### Tabela `movimento` (SQL Server)
 
-Registra movimentações de entrada e saída, cada uma com data e hora, descrição e valor. A tabela é gerada a partir da entidade JPA `MovimentoEntity` na inicialização da aplicação quando ainda não existe; quando já existe, é mantida com as linhas gravadas. Movimentações são incluídas pelo endpoint `POST /movimentos`, descrito abaixo, e cada inclusão publica o evento `MovimentoRegistrado`. Uma movimentação não tem vínculo com `pagamento` nem com cooperado.
+Registra movimentações de entrada e saída, cada uma com data e hora, descrição e valor. A tabela é criada pelo script `sql/outbox.sql`, executado manualmente no banco antes de subir a aplicação, quando ainda não existe; se o script não foi executado, o Hibernate a gera a partir da entidade JPA `MovimentoEntity` na inicialização. Quando já existe, é mantida com as linhas gravadas. Script e entidade declaram as mesmas colunas, e uma mudança em um é feita também no outro. Movimentações são incluídas pelos endpoints descritos abaixo: `POST /movimentos/inclusao`, em que cada inclusão publica o evento `MovimentoRegistrado`, e `POST /movimentos/inclusao_sem_evento`, que não publica evento. Uma movimentação não tem vínculo com `pagamento` nem com cooperado.
 
 | Coluna | Tipo | Regra |
 |---|---|---|
@@ -138,7 +140,7 @@ Registra movimentações de entrada e saída, cada uma com data e hora, descriç
 
 Na entidade, `tipo` é um campo `char`, sem classe de enumeração.
 
-#### `POST /movimentos`
+#### `POST /movimentos/inclusao`
 
 Inclui uma movimentação e grava a mensagem `MovimentoRegistrado` na outbox na mesma transação local, confirmada ao final; qualquer falha anterior ao commit desfaz a transação e não existe nem a movimentação nem a linha da outbox. A publicação no broker começa depois do commit e não faz parte da resposta, com as mesmas garantias de `PagamentoRecebido`: envio repetido até o confirm, marcação de `sent_at`, recuperação dos pendentes na inicialização e at-least-once (regras 8 a 11 e 13).
 
@@ -178,6 +180,16 @@ Corpo da resposta `201`:
 | `valor` | o valor registrado, com duas casas decimais |
 
 O `INSERT` desfeito pela falha forçada consome um valor de identidade que o SQL Server não devolve: a inclusão seguinte recebe um `id` com salto.
+
+#### `POST /movimentos/inclusao_sem_evento`
+
+Inclui uma movimentação na tabela `movimento` em transação local, sem gravar mensagem na outbox: nenhum evento é publicado para a movimentação incluída. Corpo da requisição, parâmetro `forcarFalha`, validação e corpo da resposta `201` são os de `POST /movimentos/inclusao`.
+
+| Status | Quando | Corpo |
+|---|---|---|
+| `201 Created` | movimentação gravada na transação confirmada | a movimentação registrada |
+| `400 Bad Request` | `dataHora`, `tipo`, `descricao` ou `valor` ausente ou nulo, corpo ilegível ou `forcarFalha` com valor que não é booleano | nada é gravado |
+| `500 Internal Server Error` | falha forçada por `forcarFalha=true` ou recusa do banco na gravação da movimentação | nada é gravado |
 
 ### Evento `PagamentoRecebido` (versão 1)
 
@@ -226,7 +238,7 @@ Todos os campos de texto são obrigatórios e não podem ser vazios; um envelope
 
 ### Evento `MovimentoRegistrado` (versão 1)
 
-Gravado na outbox por `POST /movimentos`, na transação da inclusão, depois do `INSERT` da movimentação. Payload, serializado como JSON em UTF-8:
+Gravado na outbox por `POST /movimentos/inclusao`, na transação da inclusão, depois do `INSERT` da movimentação. Payload, serializado como JSON em UTF-8:
 
 ```json
 {
@@ -247,7 +259,7 @@ Envelope:
 | Campo | Tipo | Valor em `MovimentoRegistrado` |
 |---|---|---|
 | `messageId` | UUID | UUID aleatório novo para cada mensagem; chave de deduplicação do consumidor |
-| `correlationId` | UUID | UUID aleatório gerado a cada inclusão; `POST /movimentos` não lê headers de rastreamento |
+| `correlationId` | UUID | UUID aleatório gerado a cada inclusão; `POST /movimentos/inclusao` não lê headers de rastreamento |
 | `idempotencyKey` | texto, até 200 caracteres | o `messageId` da própria mensagem, no formato canônico de UUID |
 | `aggregateKey` | texto, até 100 caracteres | o `id` da movimentação, em decimal (`"42"`) |
 | `type` | texto, até 100 caracteres | `MovimentoRegistrado` |
