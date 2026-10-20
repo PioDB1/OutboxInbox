@@ -38,8 +38,8 @@
     <dependencies>
         <dependency>
             <groupId>br.com.db1.poc</groupId>
-            <artifactId>mensageria-outbox</artifactId>
-            <version>${project.version}</version>
+            <artifactId>mensageria-outbox-core</artifactId>
+            <version>0.3.0-SNAPSHOT</version>
         </dependency>
 
         <!-- Spring fica como provided: a aplicação traz a própria versão do Spring Boot 3.x. -->

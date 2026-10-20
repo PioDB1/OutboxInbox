@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>br.com.db1.poc</groupId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
     <artifactId>mensageria-outbox</artifactId>
 
     <name>Mensageria Outbox</name>
@@ -17,6 +17,8 @@
     <properties>
         <!-- Piso Java 8: o release 8 vale para o código principal e para o de teste. -->
         <maven.compiler.release>8</maven.compiler.release>
+        <!-- Fontes em UTF-8, independente da codificação padrão da plataforma (ex.: Cp1252 no Windows). -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Variantes com bytecode Java 8 do driver e do Logback; a raiz fixa as de Java 11. -->
         <mssql-jdbc.version>13.4.0.jre8</mssql-jdbc.version>
         <logback.version>1.3.16</logback.version>
@@ -27,66 +29,9 @@
         <maven-failsafe-plugin.version>3.5.1</maven-failsafe-plugin.version>
     </properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.rabbitmq</groupId>
-            <artifactId>amqp-client</artifactId>
-            <version>5.37.0</version>
-        </dependency>
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-core</artifactId>
-            <version>1.17.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.20</version>
-        </dependency>
-        <dependency>
-            <groupId>com.microsoft.sqlserver</groupId>
-            <artifactId>mssql-jdbc</artifactId>
-            <scope>runtime</scope>
-            <version>${mssql-jdbc.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-            <version>5.11.0</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <scope>test</scope>
-            <version>${logback.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <scope>test</scope>
-            <version>2.0.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-mssqlserver</artifactId>
-            <scope>test</scope>
-            <version>2.0.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-rabbitmq</artifactId>
-            <scope>test</scope>
-            <version>2.0.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-toxiproxy</artifactId>
-            <scope>test</scope>
-            <version>2.0.5</version>
-        </dependency>
-    </dependencies>
+    <modules>
+        <module>core</module>
+    </modules>
 
     <build>
         <plugins>
@@ -155,22 +100,22 @@
         </plugins>
     </build>
 
-    <repositories>
-        <repository>
-            <id>JFrog-Sisprime</id>
-            <name>JFrog - Maven artifact</name>
-            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
-        </repository>
-    </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <id>JFrog-Sisprime</id>
-            <name>JFrog - Maven artifact</name>
-            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
-            <layout>default</layout>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </pluginRepository>
-    </pluginRepositories>
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>JFrog-Sisprime</id>-->
+<!--            <name>JFrog - Maven artifact</name>-->
+<!--            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>-->
+<!--        </repository>-->
+<!--    </repositories>-->
+<!--    <pluginRepositories>-->
+<!--        <pluginRepository>-->
+<!--            <id>JFrog-Sisprime</id>-->
+<!--            <name>JFrog - Maven artifact</name>-->
+<!--            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>-->
+<!--            <layout>default</layout>-->
+<!--            <snapshots>-->
+<!--                <enabled>false</enabled>-->
+<!--            </snapshots>-->
+<!--        </pluginRepository>-->
+<!--    </pluginRepositories>-->
 </project>

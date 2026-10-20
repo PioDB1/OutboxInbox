@@ -7,7 +7,7 @@
     <parent>
         <groupId>br.com.db1.poc</groupId>
         <artifactId>mensageria-outbox</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.3.0-SNAPSHOT</version>
         <relativePath>../mensageria-outbox/pom.xml</relativePath>
     </parent>
 
@@ -38,8 +38,8 @@
     <dependencies>
         <dependency>
             <groupId>br.com.db1.poc</groupId>
-            <artifactId>mensageria-outbox</artifactId>
-            <version>${project.version}</version>
+            <artifactId>mensageria-outbox-core</artifactId>
+            <version>0.3.0-SNAPSHOT</version>
         </dependency>
 
         <!-- Spring fica como provided: a aplicação traz a própria versão do Spring Boot 4.x. -->
@@ -140,23 +140,23 @@
             </plugin>
         </plugins>
     </build>
-    <repositories>
-        <repository>
-            <id>JFrog-Sisprime</id>
-            <name>JFrog - Maven artifact</name>
-            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
-        </repository>
-    </repositories>
-    <pluginRepositories>
-        <pluginRepository>
-            <id>JFrog-Sisprime</id>
-            <name>JFrog - Maven artifact</name>
-            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>
-            <layout>default</layout>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </pluginRepository>
-    </pluginRepositories>
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>JFrog-Sisprime</id>-->
+<!--            <name>JFrog - Maven artifact</name>-->
+<!--            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>-->
+<!--        </repository>-->
+<!--    </repositories>-->
+<!--    <pluginRepositories>-->
+<!--        <pluginRepository>-->
+<!--            <id>JFrog-Sisprime</id>-->
+<!--            <name>JFrog - Maven artifact</name>-->
+<!--            <url>https://artifactory.sisprimedobrasil.net:443/artifactory/dependencies-maven/</url>-->
+<!--            <layout>default</layout>-->
+<!--            <snapshots>-->
+<!--                <enabled>false</enabled>-->
+<!--            </snapshots>-->
+<!--        </pluginRepository>-->
+<!--    </pluginRepositories>-->
 
 </project>
