@@ -1,5 +1,5 @@
 @startuml
-title Padrão Outbox Assíncrono At-Least-Once
+title Padrão Outbox (Assíncrono - At-Least-Once)
 participant App
 database "Base principal" as DB
 queue "Fila" as fila
@@ -7,41 +7,42 @@ queue "Fila" as fila
 activate App
     App -> DB : Salvar dados principais da transação
     activate DB
-        App -> DB : Enviar dados de outbox
+        App -> DB : Salvar dados de outbox
+        create control "Outbox Thread" as OutboxAsync
+        App  --> OutboxAsync : Publica evento para listener
+        ... Aguarda fechamento da transação ...
+        alt Transação finalizada com sucesso
         DB --> App : Confirmação de gravação
-    deactivate DB
-    create control "Outbox Thread" as OutboxAsync
-    App -->> OutboxAsync : Dispara envio de mensagem para fila
+        deactivate DB
+        activate App
+            App -->> OutboxAsync : Disparo dos listeners existentes (Envio de mensagem)
+        activate App
+    deactivate App
 deactivate App
-group x as dd
+deactivate App
 activate OutboxAsync
-loop Confirmação de recebimento
-    OutboxAsync -> fila : Enviar dados para fila
+loop Envio de mensagem até confirmação
     break Numero de tentativas excedido
         OutboxAsync -> DB : Atualizar status de envio como falha
         create participant "Monitoramento" as monitor
         OutboxAsync -> monitor : Notificar falha de envio
+        note left #FFAAAA
+            Validar a necessidade de controle sobre tempo 
+            e se a mensagem ainda poderá ser enviada 
+            no futuro para evitar problemas de transação
+        end note
     end
-    fila --> OutboxAsync : Confirmação de recebimento
+    OutboxAsync -> fila : Enviar dados para fila
+    activate fila
+    break Mensagem recebida e confirmada
+        fila --> OutboxAsync : Confirmação de recebimento
+        deactivate fila
+    end
+    OutboxAsync -> OutboxAsync : Contabilizar falha no envio
+    deactivate fila
 end
 OutboxAsync -> DB : Atualizar status de envio
 destroy OutboxAsync
 end
 
-group Inicialização da aplicação
-    App -> DB: Consulta outbox pendentes
-    DB --> App: Retorna dados pendentes
-    create control "Outbox Thread" as OutboxAsync1
-    App-->> OutboxAsync1: Enfileirar dados pendentes
-    ref over dd: Processamento de dados pendentes
-    end
-    loop Confirmação de recebimento
-        OutboxAsync1 -> fila : Enviar dados para fila
-        activate OutboxAsync1
-            fila --> OutboxAsync1 : Confirmação de recebimento
-    end
-    OutboxAsync1 -> DB : Atualizar status de envio
-    deactivate OutboxAsync1
-    destroy OutboxAsync1
-end
 @enduml
