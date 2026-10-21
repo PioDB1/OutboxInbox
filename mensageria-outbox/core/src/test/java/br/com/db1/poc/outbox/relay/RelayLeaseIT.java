@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
-import br.com.db1.poc.outbox.support.Await;
 import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.support.Await;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;

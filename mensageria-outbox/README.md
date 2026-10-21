@@ -8,14 +8,34 @@ Lado produtor da entrega atômica de mensagens do padrão outbox/inbox: envelope
 
 | Artefato | Pasta | Papel |
 |---|---|---|
-| `br.com.db1.poc:mensageria-outbox:0.3.0-SNAPSHOT` (empacotamento `pom`) | `./` | agrega o módulo `core` e é o POM pai do `core`, do `mensageria-outbox-spring-boot3` e do `mensageria-outbox-spring-boot4`; fixa `com.rabbitmq:amqp-client` 5.37.0 no `dependencyManagement`, que prevalece sobre o BOM do Spring Boot importado pelos adaptadores, e configura compilador, enforcer de bytecode e failsafe |
-| `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT` | `core/` | a biblioteca de que a aplicação hospedeira depende; código, testes e recursos em `core/src/` |
+| `br.com.db1.poc:mensageria-outbox:0.4.0-SNAPSHOT` (empacotamento `pom`) | `./` | agrega o módulo `core` e é o POM pai do `core`, do `mensageria-outbox-spring-boot3` e do `mensageria-outbox-spring-boot4`; fixa `com.rabbitmq:amqp-client` 5.37.0 no `dependencyManagement`, que prevalece sobre o BOM do Spring Boot importado pelos adaptadores, e configura compilador, enforcer de bytecode e failsafe |
+| `br.com.db1.poc:mensageria-outbox-core:0.4.0-SNAPSHOT` | `core/` | a biblioteca de que a aplicação hospedeira depende; código, testes e recursos em `core/src/` |
 
 O `pom.xml` da raiz do repositório só agrega este POM e os dois adaptadores; ele não é POM pai de nenhum deles.
+
+## Pacotes do `core`
+
+| Pacote (`br.com.db1.poc.`) | Conteúdo |
+|---|---|
+| `outbox.write` | `OutboxWriter`: inserção na outbox na transação da aplicação |
+| `outbox.dialect`, `outbox.dialect.sqlserver` | `OutboxDialect` e o `SqlServerOutboxDialect` |
+| `outbox.publish` | `MessagePublisher`, `PublishableMessage` e `PublishException` |
+| `outbox.rabbit` | `RabbitMessagePublisher`: publicação com confirms |
+| `outbox.relay` | `Relay`, `RelayFactory`, `RelayConfig` e as duas estratégias |
+| `outbox.lease`, `outbox.retention`, `outbox.metrics` | lease de relay único, retenção e métricas |
+| `outbox.schema` | `OutboxSchemaInstaller` |
+| `shared.envelope` | `Envelope` |
+| `shared.rabbit` | `RabbitTopology` |
+| `shared.config`, `shared.logging`, `shared.schema`, `shared.dialect`, `shared.text` | `PropertyReader`, `MessageMdc`, `SqlScripts`, `SqlServerErrors` e `Texts` |
+
+`shared` é o código comum à outbox e à inbox, no mesmo artefato `mensageria-outbox-core`. Os pacotes `outbox` e `inbox` dependem de `shared`; `shared` não depende de nenhum dos dois, e `outbox` e `inbox` não dependem uma da outra. O `PackageBoundaryTest` verifica essa direção.
 
 ## Uso pelo hospedeiro
 
 ```java
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.rabbit.RabbitTopology;
+
 // 1. Esquema (idempotente): outbox, outbox_lease e outbox_read_point.
 OutboxSchemaInstaller.install(dataSource);
 

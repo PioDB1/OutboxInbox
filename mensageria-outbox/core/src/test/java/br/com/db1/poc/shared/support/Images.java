@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
 /** Imagens Docker fixadas dos testes de integração. */
 public final class Images {

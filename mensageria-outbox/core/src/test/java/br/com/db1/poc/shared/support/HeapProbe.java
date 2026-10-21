@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
 /** Medição do heap usado depois de coletas completas, para comparar o consumo em pontos distintos do processamento. */
 public final class HeapProbe {

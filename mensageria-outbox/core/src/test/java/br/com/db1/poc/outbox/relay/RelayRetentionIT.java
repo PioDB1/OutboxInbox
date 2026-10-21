@@ -5,14 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
 import br.com.db1.poc.outbox.dialect.sqlserver.SqlServerOutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.retention.OutboxRetention;
-import br.com.db1.poc.outbox.support.Await;
 import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.support.Await;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.time.Duration;

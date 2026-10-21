@@ -2,7 +2,10 @@ package br.com.db1.poc.outbox.support;
 
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.rabbit.RabbitMessagePublisher;
-import br.com.db1.poc.outbox.rabbit.RabbitTopology;
+import br.com.db1.poc.shared.rabbit.RabbitTopology;
+import br.com.db1.poc.shared.support.Await;
+import br.com.db1.poc.shared.support.TestEnvelopes;
+import br.com.db1.poc.shared.support.TestInfrastructure;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;

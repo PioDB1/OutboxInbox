@@ -8,7 +8,7 @@
 //
 //import br.com.db1.poc.outbox.dialect.OutboxDialect;
 //import br.com.db1.poc.outbox.dialect.OutboxRow;
-//import br.com.db1.poc.outbox.envelope.Envelope;
+//import br.com.db1.poc.shared.envelope.Envelope;
 //import br.com.db1.poc.outbox.publish.PublishableMessage;
 //import br.com.db1.poc.outbox.relay.PendingStats;
 //import java.time.Duration;

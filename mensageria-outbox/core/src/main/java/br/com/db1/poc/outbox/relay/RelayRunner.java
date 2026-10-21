@@ -2,13 +2,14 @@ package br.com.db1.poc.outbox.relay;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
 import br.com.db1.poc.outbox.dialect.OutboxRow;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.lease.LeaseManager;
 import br.com.db1.poc.outbox.metrics.OutboxMetrics;
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishException;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
 import br.com.db1.poc.outbox.retention.OutboxRetention;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.logging.MessageMdc;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -16,7 +17,6 @@ import java.util.Optional;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 /**
  * Esqueleto comum às duas estratégias: thread própria, laço de ciclos, lease, retenção, backoff e métricas. Cada
@@ -157,11 +157,8 @@ abstract class RelayRunner implements Relay {
     protected final Outcome publish(OutboxRow row) {
         Envelope envelope = row.envelope();
         String key = row.aggregateKey();
-        try (MDC.MDCCloseable messageId = MDC.putCloseable("messageId", envelope.messageId().toString());
-                MDC.MDCCloseable correlationId = MDC.putCloseable("correlationId",
-                        envelope.correlationId().toString());
-                MDC.MDCCloseable aggregateKey = MDC.putCloseable("aggregateKey", key);
-                MDC.MDCCloseable traceId = MDC.putCloseable("traceId", envelope.traceId())) {
+        try (MessageMdc mdc = MessageMdc.open(envelope.messageId().toString(), envelope.correlationId().toString(),
+                key, envelope.traceId())) {
             if (backoff.failures(key) > 0) {
                 metrics.recordRetry();
             }

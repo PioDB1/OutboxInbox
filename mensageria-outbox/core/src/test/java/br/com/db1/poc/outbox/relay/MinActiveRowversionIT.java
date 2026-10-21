@@ -3,10 +3,10 @@ package br.com.db1.poc.outbox.relay;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.db1.poc.outbox.support.Images;
 import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.SqlServerIT;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.support.Images;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

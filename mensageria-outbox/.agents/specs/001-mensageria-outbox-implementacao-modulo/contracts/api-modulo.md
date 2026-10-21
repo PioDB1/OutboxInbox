@@ -1,10 +1,10 @@
 # Contrato: API Java do módulo `mensageria-outbox`
 
-Superfície pública usada pelo hospedeiro (Pagamentos). Pacote base `br.com.db1.poc.outbox`. Assinaturas de referência; a implementação pode acrescentar membros sem alterar estes.
+Superfície pública usada pelo hospedeiro (Pagamentos). Pacotes base `br.com.db1.poc.outbox` (lado produtor) e `br.com.db1.poc.shared` (código comum à outbox e à inbox, no mesmo artefato). Os títulos das seções citam o pacote relativo a `br.com.db1.poc.outbox`; os que começam com `shared.` são relativos a `br.com.db1.poc.shared`. Assinaturas de referência; a implementação pode acrescentar membros sem alterar estes.
 
-## `envelope.Envelope`
+## `shared.envelope.Envelope`
 
-Classe final imutável, com um acessor de mesmo nome por campo: `UUID messageId`, `UUID correlationId`, `String idempotencyKey`, `String aggregateKey`, `String type`, `short schemaVersion`, `Instant occurredAt`, `byte[] payload`, `String traceId`. O construtor rejeita (`IllegalArgumentException`) campo nulo, texto vazio e texto acima do tamanho da coluna correspondente (`idempotencyKey` 200, `aggregateKey` 100, `type` 100, `traceId` 64). `Envelope.novo(...)` gera `messageId` aleatório (UUID v4) quando a aplicação não o informa.
+Classe final imutável, em `br.com.db1.poc.shared.envelope`, com um acessor de mesmo nome por campo: `UUID messageId`, `UUID correlationId`, `String idempotencyKey`, `String aggregateKey`, `String type`, `short schemaVersion`, `Instant occurredAt`, `byte[] payload`, `String traceId`. O construtor rejeita (`IllegalArgumentException`) campo nulo, texto vazio e texto acima do tamanho da coluna correspondente (`idempotencyKey` 200, `aggregateKey` 100, `type` 100, `traceId` 64). `Envelope.novo(...)` gera `messageId` aleatório (UUID v4) quando a aplicação não o informa.
 
 ## `write.OutboxWriter`
 
@@ -43,7 +43,9 @@ public interface MessagePublisher extends AutoCloseable {
 
 `PublishableMessage` carrega os campos do `Envelope`. `PublishException` cobre confirm negativo, timeout de confirm, mensagem devolvida e erro de conexão.
 
-## `rabbit.RabbitMessagePublisher` e `rabbit.RabbitTopology`
+## `rabbit.RabbitMessagePublisher` e `shared.rabbit.RabbitTopology`
+
+`RabbitTopology` está em `br.com.db1.poc.shared.rabbit`.
 
 ```java
 public RabbitMessagePublisher(ConnectionFactory factory, String exchange, Duration confirmTimeout);

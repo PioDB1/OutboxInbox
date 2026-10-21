@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.db1.poc.outbox.dialect.sqlserver.SqlServerOutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.support.SqlServerIT;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

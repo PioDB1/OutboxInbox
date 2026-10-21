@@ -1,6 +1,6 @@
 package br.com.db1.poc.outbox.dialect;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.util.Objects;
 
 /** Linha lida da outbox: o {@code seq}, o {@code rv} (rowversion de 8 bytes) e o envelope reconstruído. */

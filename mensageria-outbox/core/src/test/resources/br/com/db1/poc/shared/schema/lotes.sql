@@ -1,0 +1,14 @@
+SELECT 1;
+GO
+SELECT 2;
+go
+  Go
+
+SELECT 3;
+
+
+GO
+
+GO
+SELECT 4;
+SELECT 5;

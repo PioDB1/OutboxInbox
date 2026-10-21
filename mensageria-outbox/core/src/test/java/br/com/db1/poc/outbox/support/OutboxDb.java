@@ -1,9 +1,9 @@
 package br.com.db1.poc.outbox.support;
 
 import br.com.db1.poc.outbox.dialect.sqlserver.SqlServerOutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.relay.RelayStrategyType;
 import br.com.db1.poc.outbox.write.OutboxWriter;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
 import java.time.Duration;
 import java.util.function.BooleanSupplier;

@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.internal;
+package br.com.db1.poc.shared.text;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -2,7 +2,7 @@ package br.com.db1.poc.outbox.relay;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
 import br.com.db1.poc.outbox.dialect.OutboxRow;
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.util.ArrayList;

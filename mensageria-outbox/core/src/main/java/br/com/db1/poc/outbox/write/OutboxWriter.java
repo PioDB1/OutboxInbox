@@ -1,7 +1,7 @@
 package br.com.db1.poc.outbox.write;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.sql.Connection;
 import java.sql.SQLException;
 

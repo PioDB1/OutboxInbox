@@ -1,6 +1,6 @@
 package br.com.db1.poc.outbox.publish;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;

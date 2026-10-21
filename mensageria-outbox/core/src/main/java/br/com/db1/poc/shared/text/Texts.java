@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.internal;
+package br.com.db1.poc.shared.text;
 
 /**
  * Operações de texto cuja definição de espaço em branco é a de {@link Character#isWhitespace(int)}, a mesma de

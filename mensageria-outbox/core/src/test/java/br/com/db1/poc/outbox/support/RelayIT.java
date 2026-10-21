@@ -5,6 +5,7 @@ import br.com.db1.poc.outbox.relay.Relay;
 import br.com.db1.poc.outbox.relay.RelayConfig;
 import br.com.db1.poc.outbox.relay.RelayFactory;
 import br.com.db1.poc.outbox.relay.RelayStrategyType;
+import br.com.db1.poc.shared.support.Await;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;

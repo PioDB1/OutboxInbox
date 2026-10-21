@@ -2,7 +2,8 @@ package br.com.db1.poc.outbox.dialect.sqlserver;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
 import br.com.db1.poc.outbox.dialect.OutboxRow;
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.dialect.SqlServerErrors;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -25,8 +26,6 @@ import java.util.UUID;
 public final class SqlServerOutboxDialect implements OutboxDialect {
 
     private static final String RELAY_NAME = "relay";
-    private static final int DUPLICATE_KEY_CONSTRAINT = 2627;
-    private static final int DUPLICATE_KEY_INDEX = 2601;
 
     private static final String COLUMNS =
             "seq, rv, message_id, correlation_id, idempotency_key, aggregate_key, type, schema_ver, occurred_at,"
@@ -197,7 +196,7 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
             statement.setBytes(2, rv);
             statement.executeUpdate();
         } catch (SQLException e) {
-            if (!isDuplicateKey(e)) {
+            if (!SqlServerErrors.isDuplicateKey(e)) {
                 throw e;
             }
             updateReadPoint(connection, rv);
@@ -239,7 +238,7 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
             statement.setString(4, RELAY_NAME);
             return statement.executeUpdate() > 0;
         } catch (SQLException e) {
-            if (isDuplicateKey(e)) {
+            if (SqlServerErrors.isDuplicateKey(e)) {
                 return false;
             }
             throw e;
@@ -330,9 +329,5 @@ public final class SqlServerOutboxDialect implements OutboxDialect {
 
     private static LocalDateTime toUtc(java.time.Instant instant) {
         return LocalDateTime.ofInstant(instant.truncatedTo(ChronoUnit.MICROS), ZoneOffset.UTC);
-    }
-
-    private static boolean isDuplicateKey(SQLException e) {
-        return e.getErrorCode() == DUPLICATE_KEY_CONSTRAINT || e.getErrorCode() == DUPLICATE_KEY_INDEX;
     }
 }

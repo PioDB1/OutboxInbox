@@ -1,11 +1,10 @@
 package br.com.db1.poc.outbox.relay;
 
-import br.com.db1.poc.outbox.internal.Texts;
+import br.com.db1.poc.shared.config.PropertyReader;
+import br.com.db1.poc.shared.text.Texts;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Configuração do relay, lida das chaves {@code outbox.relay.*}.
@@ -13,8 +12,6 @@ import java.util.regex.Pattern;
 public final class RelayConfig {
 
     public static final String PREFIX = "outbox.relay.";
-
-    private static final Pattern DURATION = Pattern.compile("(\\d+)\\s*(ms|s|m|h|d)");
 
     private final boolean enabled;
     private final RelayStrategyType strategy;
@@ -218,81 +215,27 @@ public final class RelayConfig {
      *                                  valor inválido
      */
     public static RelayConfig fromProperties(Properties properties) {
-        String strategy = text(properties, "strategy", null);
+        PropertyReader reader = new PropertyReader(properties, PREFIX);
+        String strategy = reader.text("strategy", null);
         if (strategy == null) {
             throw new IllegalArgumentException(PREFIX + "strategy é obrigatória; valores aceitos: "
                     + RelayStrategyType.acceptedValues());
         }
         return new RelayConfig(
-                Boolean.parseBoolean(text(properties, "enabled", "false")),
+                Boolean.parseBoolean(reader.text("enabled", "false")),
                 RelayStrategyType.fromValue(strategy),
-                text(properties, "exchange", "mensageria.outbox"),
-                integer(properties, "batch-size", 100),
-                duration(properties, "poll-interval", "500ms"),
-                duration(properties, "confirm-timeout", "5s"),
-                duration(properties, "backoff.initial", "200ms"),
-                decimal(properties, "backoff.multiplier", 2.0),
-                duration(properties, "backoff.max", "30s"),
-                duration(properties, "lease.duration", "15s"),
-                duration(properties, "lease.renew-interval", "5s"),
-                duration(properties, "retention.max-age", "7d"),
-                duration(properties, "retention.interval", "60s"),
-                integer(properties, "retention.batch-size", 1000));
-    }
-
-    private static String text(Properties properties, String key, String defaultValue) {
-        String value = properties.getProperty(PREFIX + key);
-        return value == null || Texts.isBlank(value) ? defaultValue : Texts.strip(value);
-    }
-
-    private static int integer(Properties properties, String key, int defaultValue) {
-        String value = text(properties, key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(PREFIX + key + " deve ser um inteiro: '" + value + "'", e);
-        }
-    }
-
-    private static double decimal(Properties properties, String key, double defaultValue) {
-        String value = text(properties, key, null);
-        if (value == null) {
-            return defaultValue;
-        }
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(PREFIX + key + " deve ser um número: '" + value + "'", e);
-        }
-    }
-
-    private static Duration duration(Properties properties, String key, String defaultValue) {
-        String value = text(properties, key, defaultValue);
-        Matcher matcher = DURATION.matcher(value);
-        if (matcher.matches()) {
-            long amount = Long.parseLong(matcher.group(1));
-            switch (matcher.group(2)) {
-                case "ms":
-                    return Duration.ofMillis(amount);
-                case "s":
-                    return Duration.ofSeconds(amount);
-                case "m":
-                    return Duration.ofMinutes(amount);
-                case "h":
-                    return Duration.ofHours(amount);
-                default:
-                    return Duration.ofDays(amount);
-            }
-        }
-        try {
-            return Duration.parse(value);
-        } catch (java.time.format.DateTimeParseException e) {
-            throw new IllegalArgumentException(PREFIX + key
-                    + " deve ser uma duração (ex.: 500ms, 5s, 2m, 1h, 7d ou ISO-8601): '" + value + "'", e);
-        }
+                reader.text("exchange", "mensageria.outbox"),
+                reader.integer("batch-size", 100),
+                reader.duration("poll-interval", "500ms"),
+                reader.duration("confirm-timeout", "5s"),
+                reader.duration("backoff.initial", "200ms"),
+                reader.decimal("backoff.multiplier", 2.0),
+                reader.duration("backoff.max", "30s"),
+                reader.duration("lease.duration", "15s"),
+                reader.duration("lease.renew-interval", "5s"),
+                reader.duration("retention.max-age", "7d"),
+                reader.duration("retention.interval", "60s"),
+                reader.integer("retention.batch-size", 1000));
     }
 
     private static void requirePositive(int value, String key) {

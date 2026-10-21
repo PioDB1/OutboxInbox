@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.rabbit;
+package br.com.db1.poc.shared.rabbit;
 
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;

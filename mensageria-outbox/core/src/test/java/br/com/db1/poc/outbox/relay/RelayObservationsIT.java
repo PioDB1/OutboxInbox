@@ -2,13 +2,13 @@ package br.com.db1.poc.outbox.relay;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.metrics.OutboxMetrics;
-import br.com.db1.poc.outbox.support.Await;
 import br.com.db1.poc.outbox.support.OutboxDb;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.support.Await;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;

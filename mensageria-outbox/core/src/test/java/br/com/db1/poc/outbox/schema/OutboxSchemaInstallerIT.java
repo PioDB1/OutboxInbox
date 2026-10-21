@@ -3,7 +3,7 @@ package br.com.db1.poc.outbox.schema;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import br.com.db1.poc.outbox.support.SqlServerIT;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
 

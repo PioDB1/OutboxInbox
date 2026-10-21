@@ -33,10 +33,10 @@ As properties espelham os headers para ferramentas de operação; o consumidor l
 
 ## Roteamento e topologia
 
-- Exchange: tipo `direct`, durável, nome configurável (`outbox.relay.exchange`, padrão `mensageria.outbox`), declarada por `RabbitTopology.declareExchange`.
+- Exchange: tipo `direct`, durável, nome configurável (`outbox.relay.exchange`, padrão `mensageria.outbox`), declarada por `shared.rabbit.RabbitTopology.declareExchange` (`br.com.db1.poc.shared.rabbit.RabbitTopology`).
 - Routing key: o `type` do envelope.
 - Publicação com `mandatory=true`; mensagem devolvida por `basic.return` (sem fila ligada à routing key) é falha de publicação e a linha permanece pendente.
-- Fila de destino: declarada pela aplicação com `RabbitTopology.declareQuorumQueue(queue, routingKey)`, com argumentos `x-queue-type=quorum`, `durable=true`, `exclusive=false`, `auto-delete=false` e nenhum outro argumento. Quem declarar a mesma fila com argumentos diferentes recebe `PRECONDITION_FAILED`; todo declarante da fila principal repete exatamente esses argumentos.
+- Fila de destino: declarada pela aplicação com `shared.rabbit.RabbitTopology.declareQuorumQueue(channel, queue, exchange, routingKey)`, com argumentos `x-queue-type=quorum`, `durable=true`, `exclusive=false`, `auto-delete=false` e nenhum outro argumento. Quem declarar a mesma fila com argumentos diferentes recebe `PRECONDITION_FAILED`; todo declarante da fila principal repete exatamente esses argumentos.
 
 ## Garantias
 

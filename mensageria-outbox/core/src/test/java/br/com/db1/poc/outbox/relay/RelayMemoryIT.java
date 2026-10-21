@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
-import br.com.db1.poc.outbox.support.HeapProbe;
 import br.com.db1.poc.outbox.support.SqlServerIT;
+import br.com.db1.poc.shared.support.HeapProbe;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Arrays;
 import java.util.Properties;

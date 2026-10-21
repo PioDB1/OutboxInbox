@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.envelope;
+package br.com.db1.poc.shared.envelope;
 
 import java.time.Instant;
 import java.util.Arrays;

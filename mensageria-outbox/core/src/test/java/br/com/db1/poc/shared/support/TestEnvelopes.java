@@ -1,6 +1,6 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
+import br.com.db1.poc.shared.envelope.Envelope;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;

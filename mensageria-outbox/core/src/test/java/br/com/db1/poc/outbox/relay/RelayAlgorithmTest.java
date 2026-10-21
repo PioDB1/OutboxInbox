@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.publish.PublishException;
-import br.com.db1.poc.outbox.support.Await;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.support.Await;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;

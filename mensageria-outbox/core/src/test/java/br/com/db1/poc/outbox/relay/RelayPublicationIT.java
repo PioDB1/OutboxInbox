@@ -6,11 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
-import br.com.db1.poc.outbox.rabbit.RabbitTopology;
 import br.com.db1.poc.outbox.support.RelayIT;
 import br.com.db1.poc.outbox.support.ScriptedPublisher;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.envelope.Envelope;
+import br.com.db1.poc.shared.rabbit.RabbitTopology;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;

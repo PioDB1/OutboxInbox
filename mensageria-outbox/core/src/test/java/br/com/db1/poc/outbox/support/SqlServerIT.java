@@ -1,6 +1,7 @@
 package br.com.db1.poc.outbox.support;
 
 import br.com.db1.poc.outbox.schema.OutboxSchemaInstaller;
+import br.com.db1.poc.shared.support.TestInfrastructure;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Assumptions;

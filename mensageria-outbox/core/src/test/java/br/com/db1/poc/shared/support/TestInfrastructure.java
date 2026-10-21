@@ -1,6 +1,6 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
-import br.com.db1.poc.outbox.internal.Texts;
+import br.com.db1.poc.shared.text.Texts;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import com.rabbitmq.client.ConnectionFactory;
 import eu.rekawek.toxiproxy.Proxy;

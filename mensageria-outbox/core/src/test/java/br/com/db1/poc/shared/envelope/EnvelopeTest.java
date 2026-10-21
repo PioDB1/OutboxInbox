@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.envelope;
+package br.com.db1.poc.shared.envelope;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

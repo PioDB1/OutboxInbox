@@ -1,4 +1,4 @@
-package br.com.db1.poc.outbox.support;
+package br.com.db1.poc.shared.support;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;

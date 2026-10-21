@@ -8,7 +8,7 @@ import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishException;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
 import br.com.db1.poc.outbox.support.BrokerIT;
-import br.com.db1.poc.outbox.support.TestEnvelopes;
+import br.com.db1.poc.shared.support.TestEnvelopes;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
