@@ -14,7 +14,14 @@ public final class LogCapture implements AutoCloseable {
 
     private final Logger logger;
     private final Level previousLevel;
-    private final ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    /** Fixa o MDC no momento do log: o evento lê o MDC da thread que o consulta, e os testes o leem em outra. */
+    private final ListAppender<ILoggingEvent> appender = new ListAppender<ILoggingEvent>() {
+        @Override
+        protected void append(ILoggingEvent event) {
+            event.prepareForDeferredProcessing();
+            super.append(event);
+        }
+    };
 
     public LogCapture(Class<?> source) {
         this.logger = (Logger) LoggerFactory.getLogger(source);

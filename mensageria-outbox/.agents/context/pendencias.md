@@ -1,13 +1,13 @@
 ---
 name: pendencias
-description: Pendências conhecidas do componente mensageria-outbox (núcleo mensageria-outbox-core e build) — defeitos encontrados na validação de 2026-10-20 e registrados sem correção, cada um com arquivo, efeito, severidade, forma de verificação e decisão; o núcleo da inbox (lado consumidor, documentado pela skill mensageria-inbox), a implementar no mensageria-outbox-core junto da outbox e da auto-configuração Spring; e o estado das chaves bloqueadas na DLQ, sem tratamento decidido.
+description: Pendências conhecidas do componente mensageria-outbox (núcleo mensageria-outbox-core e build) — defeitos encontrados na validação de 2026-10-20 e registrados sem correção, cada um com arquivo, efeito, severidade, forma de verificação e decisão; e o estado das chaves bloqueadas na DLQ do consumidor, guardado só em memória e sem tratamento decidido para o reinício e a liberação.
 metadata:
   author: clovis-cli
 ---
 
 # Pendências do componente
 
-Defeitos encontrados na validação de 2026-10-20 (decisão D15 de `discovery-answers.md`), de P1 a P5; o núcleo da inbox a implementar no `mensageria-outbox-core`, em P6; e o estado das chaves bloqueadas na DLQ, em P7. Caminhos relativos a `mensageria-outbox/`. "Confirmado no código" indica leitura do código-fonte; "não reproduzido em teste" indica que nenhum teste exercita o defeito.
+Defeitos encontrados na validação de 2026-10-20 (decisão D15 de `discovery-answers.md`), de P1 a P5; e o estado das chaves bloqueadas na DLQ do consumidor, em P7. Caminhos relativos a `mensageria-outbox/`. "Confirmado no código" indica leitura do código-fonte; "não reproduzido em teste" indica que nenhum teste exercita o defeito.
 
 ## P1. Conexão órfã por queda do broker
 
@@ -54,20 +54,10 @@ Defeitos encontrados na validação de 2026-10-20 (decisão D15 de `discovery-an
 - **Verificação:** confirmados nos arquivos.
 - **Decisão:** registrados em 2026-10-20, sem correção nesta rodada.
 
-## P6. Núcleo da inbox a implementar no `mensageria-outbox-core`
-
-O lado consumidor faz parte da solução outbox/inbox e é implementado no artefato `mensageria-outbox-core`, junto da outbox, com a auto-configuração Spring do consumidor nos artefatos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`. A skill `.agents/skills/mensageria-inbox/SKILL.md` é a fonte das regras (R1 a R18); `Inbox.puml` mostra o fluxo de idempotência; `spec-caso-a-outbox-inbox.md` traz a tabela `inbox` (§5), o envelope (§6.1), RF-A6 a RF-A8, RF-A10 e RF-A11 e os cenários A-F2 e A-F6 (§11).
-
-- **O quê:** o componente não tem consumidor nem inbox. Falta o núcleo do lado consumidor: leitura do envelope, consumidor com ack manual, inbox e dedup por `messageId` na transação local, serialização por `aggregateKey`, retry com backoff, DLQ, métricas e logs de consumo, dialetos H2 e SQL Server, e a auto-configuração Spring.
-- **Onde:** `core/src/main/java/br/com/db1/poc/outbox/`, que só tem o lado produtor; `../mensageria-outbox-spring-boot-shared/src/main/java/br/com/db1/poc/outbox/spring/`, `../mensageria-outbox-spring-boot3/` e `../mensageria-outbox-spring-boot4/`, que só integram a outbox (P1 de `../mensageria-outbox-spring-boot-shared/.agents/context/pendencias.md` e P2 de `../mensageria-outbox-spring-boot3/.agents/context/pendencias.md` e de `../mensageria-outbox-spring-boot4/.agents/context/pendencias.md`).
-- **Efeito:** o `demooutboxinbox` consome a fila `movimentos.movimento-registrado` com código próprio (`MovimentoConsumoService`, em `POST /movimentos/consumo`): `basicGet` pelo `amqp-client`, inbox gravada em transação local e ack depois do commit, sem retry com backoff, DLQ, serialização por `aggregateKey` nem métricas de consumo. Uma mensagem que falha sempre volta para a fila até o limite de entregas da fila quorum (20), quando o broker a descarta.
-- **Verificação:** confirmado na estrutura do componente.
-- **Decisão:** decisão humana de 2026-10-20, na spec `005-pagamentos-consumo-movimento-registrado` do `demooutboxinbox`, de registrar a ausência como pendência; decisão humana de 2026-10-21 de implementar o núcleo da inbox no `mensageria-outbox-core`, no mesmo artefato da outbox e sem novo artefato para importação, com o mesmo contexto de beans do Spring da outbox. Escopo, plano, tarefas e casos de teste na spec [`003-mensageria-outbox-nucleo-inbox`](../specs/003-mensageria-outbox-nucleo-inbox/spec.md). A substituição do consumo próprio do demo é a P1 de `../../demooutboxinbox/.agents/context/pendencias.md`.
-
 ## P7. Estado das chaves bloqueadas por mensagem na DLQ (R10b)
 
 - **O quê:** depois que uma mensagem vai para a DLQ por exceder o limite de tentativas, as mensagens seguintes da mesma `aggregateKey` também vão para a DLQ (R10b da skill `mensageria-inbox`). Não está decidido onde esse estado de chave bloqueada é guardado, se sobrevive ao reinício do consumidor e como a chave é liberada depois da revisão manual.
-- **Onde:** `core/src/main/java/br/com/db1/poc/inbox/`, na implementação do núcleo da inbox da P6.
-- **Efeito:** a implementação da P6 guarda as chaves bloqueadas em memória, atrás de uma interface, e não oferece liberação: a chave segue bloqueada até o consumidor reiniciar. Depois do reinício, a próxima mensagem da chave é aplicada sem a mensagem que foi para a DLQ, o que quebra a ordem da chave.
+- **Onde:** `core/src/main/java/br/com/db1/poc/inbox/`, `InMemoryBlockedKeys`, implementação única da interface `BlockedKeys`.
+- **Efeito:** as chaves bloqueadas ficam em memória, atrás da interface `BlockedKeys`, e não há liberação: a chave segue bloqueada até o consumidor reiniciar. Depois do reinício, a próxima mensagem da chave é aplicada sem a mensagem que foi para a DLQ, o que quebra a ordem da chave.
 - **Verificação:** confirmado na skill `mensageria-inbox` (R10b, que não define o armazenamento) e em `spec-caso-a-outbox-inbox.md` (RF-A8 e A-F6, que também não o definem).
-- **Decisão:** decisão humana de 2026-10-21 — registrar como pendência, sem decidir o tratamento; a implementação da P6 só cobre o bloqueio durante a vida do processo.
+- **Decisão:** decisão humana de 2026-10-21 — registrar como pendência, sem decidir o tratamento; o consumidor só cobre o bloqueio durante a vida do processo. A decisão futura entra por uma nova implementação de `BlockedKeys`, sem alterar o consumidor.

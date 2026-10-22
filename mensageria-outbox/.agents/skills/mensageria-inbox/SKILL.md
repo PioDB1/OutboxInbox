@@ -14,13 +14,13 @@ metadata:
 
 ## Visão geral
 
-O Mensageria Inbox é o módulo do lado **consumidor** da entrega atômica de mensagens entre duas aplicações, cada uma com o seu banco, sem transação distribuída (sem XA, sem JTA, sem gerenciador de transação externo). Ele recebe mensagens do broker publicadas de forma **at-least-once** (podem chegar repetidas) e garante que o efeito de negócio seja aplicado **uma única vez**:
+O Mensageria Inbox é o lado **consumidor** da entrega atômica de mensagens entre duas aplicações, cada uma com o seu banco, sem transação distribuída (sem XA, sem JTA, sem gerenciador de transação externo). Ele recebe mensagens do broker publicadas de forma **at-least-once** (podem chegar repetidas) e garante que o efeito de negócio seja aplicado **uma única vez**:
 
 1. O broker entrega a mensagem ao consumidor.
 2. O consumidor grava o efeito de negócio **e** o registro na **inbox** na mesma transação local do seu banco.
 3. Só depois do commit o consumidor confirma a mensagem (ack manual).
 
-O dedup por `messageId` na inbox transforma a entrega at-least-once em efeito exatamente-uma-vez. O módulo é isolado e autossuficiente: carrega a sua própria definição do envelope padrão, e a base é reaproveitada por um segundo caso (coordenação de vários passos com compensação); esse caso está fora deste domínio.
+O dedup por `messageId` na inbox transforma a entrega at-least-once em efeito exatamente-uma-vez. O consumidor é parte do artefato `mensageria-outbox-core` (pacote `br.com.db1.poc.inbox`, ao lado do `br.com.db1.poc.outbox`), com Java 8 como piso. Os dois lados usam o mesmo `Envelope`, do pacote `br.com.db1.poc.shared` do mesmo artefato; `inbox` e `outbox` são independentes entre si e dependem só de `shared`. A base é reaproveitada por um segundo caso (coordenação de vários passos com compensação); esse caso está fora deste domínio.
 
 O módulo cobre: envelope (leitura), consumidor com ack manual, serialização por `aggregateKey`, inbox, dedup, retry/backoff, DLQ e métricas de consumo.
 
@@ -57,13 +57,13 @@ Numeração própria desta skill (R1, R2, ...).
 - **R9.** Falha no processamento (a transação do efeito falha, ou o payload é inválido) segue **política de retry com backoff**. A transação com falha é revertida, portanto nada é gravado na inbox e a nova entrega é tratada como mensagem nova.
 - **R10.** Depois de um **limite configurável de tentativas**, a mensagem vai para a **DLQ**. A mensagem inválida ("veneno") não bloqueia as mensagens de **outras chaves**: elas seguem sendo processadas enquanto ela espera suas tentativas ou já está na DLQ.
 - **R10a.** Durante o retry com backoff de uma mensagem, a **sua chave espera**: as mensagens seguintes do mesmo `aggregateKey` só são processadas depois que a anterior é aplicada ou vai para a DLQ, o que preserva a ordem (R8).
-- **R10b.** Depois que uma mensagem vai para a DLQ por exceder o limite de tentativas, as **mensagens seguintes da mesma `aggregateKey` também vão para a DLQ**, para revisão manual. Aplicá-las pularia a mensagem perdida e quebraria a ordem da chave.
+- **R10b.** Depois que uma mensagem vai para a DLQ por exceder o limite de tentativas, as **mensagens seguintes da mesma `aggregateKey` também vão para a DLQ**, para revisão manual. Aplicá-las pularia a mensagem perdida e quebraria a ordem da chave. O bloqueio da chave vive só na memória do processo (`BlockedKeys`, implementação `InMemoryBlockedKeys`): o reinício do consumidor libera as chaves bloqueadas, e não há liberação durante a execução. O armazenamento além da vida do processo e a liberação da chave depois da revisão manual aguardam a decisão P7 de `.agents/context/pendencias.md`.
 - **R11.** A DLQ é uma fila declarada pela aplicação, junto da fila principal (que é quorum, durável).
 
 ### Dialeto e portabilidade
 
 - **R12.** O acesso à inbox é isolado por **dialeto** de banco. Onde a aplicação consumidora usa H2 em arquivo, o dialeto H2 é o utilizado: a inbox não depende de recursos exclusivos do SQL Server.
-- **R13.** O módulo **não depende de framework de aplicação**; cada framework entra por um adaptador fino.
+- **R13.** O consumidor **não depende de framework de aplicação**; cada framework entra por um adaptador fino. O Spring Boot entra pelos artefatos `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`, com a `InboxAutoConfiguration` do código comum `mensageria-outbox-spring-boot-shared/`, no mesmo contexto de beans da outbox.
 - **R14.** O módulo conhece o broker apenas por uma **interface de consumo**. Trocar de broker exige somente um novo adaptador. O adaptador RabbitMQ é o único que conhece detalhes do broker (filas quorum, ack manual).
 
 ### Observabilidade
@@ -142,17 +142,28 @@ No H2, os tipos do SQL Server têm equivalentes (identificador único como `UUID
 
 ## Parâmetros configuráveis
 
-Os parâmetros abaixo são configuráveis; nenhum valor padrão é definido pelas fontes e os valores são escolhidos e registrados na implementação:
+Chaves `inbox.consumer.*` (`InboxConfig.fromProperties` no `core`, `InboxProperties` no Spring), com os padrões escolhidos pela unidade `003-mensageria-outbox-nucleo-inbox`; nenhum é meta de desempenho:
 
-- limite de tentativas do consumidor antes da DLQ e a política de backoff;
-- limite de mensagens em voo do consumidor;
-- limites de heap e de memória direta do processo do consumidor.
+| Chave | Padrão | Significado |
+|---|---|---|
+| `inbox.consumer.queue` | obrigatória | fila principal (quorum, durável, declarada pela aplicação) |
+| `inbox.consumer.dead-letter-queue` | `<queue>.dlq` | DLQ (quorum, durável, declarada pela aplicação) |
+| `inbox.consumer.max-attempts` | `5` | tentativas de processamento por mensagem antes da DLQ (a primeira conta) |
+| `inbox.consumer.backoff.initial` | `200ms` | intervalo depois da primeira falha |
+| `inbox.consumer.backoff.multiplier` | `2.0` | fator de crescimento do intervalo (finito e maior ou igual a 1,0) |
+| `inbox.consumer.backoff.max` | `30s` | teto do intervalo |
+| `inbox.consumer.max-in-flight` | `50` | mensagens sem ack, igual ao `basicQos` |
+| `inbox.consumer.workers` | `8` | threads de trabalho que executam as filas por chave |
+| `inbox.consumer.confirm-timeout` | `5s` | espera do confirm da publicação na DLQ |
+
+O intervalo depois da n-ésima falha é `min(backoff.max, backoff.initial × backoff.multiplier^(n-1))`. Os limites de heap e de memória direta do processo do consumidor também são configuráveis.
 
 O repositório não declara variáveis de ambiente específicas deste domínio.
 
 ## Integrações e dependências externas
 
-- **H2 em arquivo:** banco da inbox onde os recursos exclusivos do SQL Server não são necessários.
+- **H2 em arquivo:** banco da inbox onde os recursos exclusivos do SQL Server não são necessários (aplicação Extrato).
+- **SQL Server:** banco da inbox da aplicação consumidora que já o usa (banco do `demooutboxinbox`); a tabela `inbox` tem a mesma estrutura do `sql/outbox.sql` do demo.
 - **RabbitMQ:** broker com filas quorum e ack manual, acessado pelo adaptador de broker.
 - **Micrometer:** métricas.
 
@@ -161,7 +172,7 @@ As dependências técnicas e as precondições de ambiente do domínio estão em
 ## Pontos em aberto
 
 - Se o código da PoC é descartável ou evolui para o starter interno é uma pergunta sem decisão; não bloqueia o domínio, e o isolamento do módulo (sem framework de aplicação, broker por interface) o mantém reaproveitável.
-- A compatibilidade de Micrometer e Testcontainers com a versão mínima de plataforma deve ser verificada na implementação.
+- A compatibilidade de Micrometer e Testcontainers com a plataforma do consumidor (Java 8 como piso do `core`) é verificada pela suíte do `core` nos JDKs 8, 11, 17, 21 e 25.
 
 ## Manutenção
 

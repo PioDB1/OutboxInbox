@@ -26,11 +26,11 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishException;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
 import br.com.db1.poc.outbox.relay.BackoffPolicy;
+import br.com.db1.poc.shared.envelope.Envelope;
 
 /**
  * Publica as linhas da outbox de forma assíncrona, preservando a ordem por {@code aggregateKey}: as mensagens da

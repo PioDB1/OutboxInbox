@@ -4,7 +4,7 @@ Instruções canônicas para agentes de código nesta pasta. `CLAUDE.md` e `.git
 
 ## Visão geral
 
-O `mensageria-outbox-spring-boot-shared` é o código-fonte comum da auto-configuração que integra a biblioteca `mensageria-outbox` (lado produtor do padrão outbox) a aplicações Spring Boot: gravação da outbox na transação da aplicação, envio assíncrono ao RabbitMQ após o commit, com ordem por `aggregateKey`, e recuperação dos pendentes na inicialização.
+O `mensageria-outbox-spring-boot-shared` é o código-fonte comum da auto-configuração que integra a biblioteca `mensageria-outbox` (lados produtor e consumidor do padrão outbox/inbox) a aplicações Spring Boot. Lado produtor: gravação da outbox na transação da aplicação, envio assíncrono ao RabbitMQ após o commit, com ordem por `aggregateKey`, e recuperação dos pendentes na inicialização. Lado consumidor: um `InboxConsumer` criado quando a aplicação define `inbox.consumer.queue` e um bean `InboxMessageHandler`, iniciado e parado pelo ciclo de vida do Spring, que executa cada mensagem em uma transação Spring junto do registro na inbox.
 
 A pasta não é um módulo Maven: não tem `pom.xml`, não gera artefato e não consta do agregador da raiz (`../pom.xml`). Os dois módulos que a consomem acrescentam `src/main/java` e `src/test/java` daqui às próprias fontes com o `build-helper-maven-plugin` e compilam esse código contra a sua linha do Spring Boot.
 
@@ -12,7 +12,7 @@ Relação com as pastas irmãs do componente:
 
 - **`../mensageria-outbox-spring-boot3`** — artefato `br.com.db1.poc:mensageria-outbox-spring-boot3` para Spring Boot 3.x; inclui este código.
 - **`../mensageria-outbox-spring-boot4`** — artefato `br.com.db1.poc:mensageria-outbox-spring-boot4` para Spring Boot 4.x; inclui este código.
-- **`../mensageria-outbox`** — a biblioteca (envelope, `OutboxWriter`, dialeto SQL Server, `RabbitMessagePublisher`, relay por polling) e o POM pai dos dois módulos.
+- **`../mensageria-outbox`** — a biblioteca (envelope, `OutboxWriter`, dialeto SQL Server, `RabbitMessagePublisher`, relay por polling, `InboxConsumer`, dialetos H2 e SQL Server da inbox, `RabbitMessageSource`) e o POM pai dos dois módulos.
 - **`../demooutboxinbox`** — aplicação de demonstração (Spring Boot 4.1.1, JPA) que consome o artefato Spring Boot 4.x.
 
 Cada módulo guarda apenas o que difere entre as linhas do Spring Boot: `OutboxRabbitConnectionFactoryConfiguration` e o arquivo `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
@@ -21,10 +21,10 @@ Cada módulo guarda apenas o que difere entre as linhas do Spring Boot: `OutboxR
 
 - Java 17 como piso (`--release 17` nos dois módulos, com o enforcer recusando bytecode acima de 17); o build roda em JDK 21.
 - Spring Boot 3.x (compilado e testado com 3.5.16 no módulo `mensageria-outbox-spring-boot3`) e 4.x (4.1.1 no módulo `mensageria-outbox-spring-boot4`), com o Spring como dependência `provided`: `spring-boot-autoconfigure`, `spring-boot-starter-amqp` e `spring-boot-starter-jdbc`.
-- Biblioteca `br.com.db1.poc:mensageria-outbox-core:0.3.0-SNAPSHOT`, que traz o `com.rabbitmq:amqp-client` 5.37.0.
-- SQL Server como único banco suportado (`SqlServerOutboxDialect`) e RabbitMQ com publisher confirms.
-- SLF4J com MDC para os logs de publicação.
-- Testes com JUnit Jupiter, AssertJ, `spring-boot-test` (`ApplicationContextRunner`) e `spring-test`.
+- Biblioteca `br.com.db1.poc:mensageria-outbox-core:0.4.0-SNAPSHOT`, que traz o `com.rabbitmq:amqp-client` 5.37.0.
+- SQL Server como único banco da outbox (`SqlServerOutboxDialect`); SQL Server ou H2 na inbox (`SqlServerInboxDialect` e `H2InboxDialect`, escolhidos pelo produto do `DataSource`). RabbitMQ com publisher confirms na publicação e ack manual no consumo.
+- SLF4J com MDC para os logs de publicação e de consumo.
+- Testes com JUnit Jupiter, AssertJ, `spring-boot-test` (`ApplicationContextRunner`), `spring-test` e H2 em memória (versão do BOM do Spring Boot, escopo `test`).
 
 ## Estrutura
 
@@ -32,8 +32,12 @@ Cada módulo guarda apenas o que difere entre as linhas do Spring Boot: `OutboxR
 mensageria-outbox-spring-boot-shared/
 ├── README.md                                      # o que é compartilhado e como entra nos módulos
 ├── src/main/java/br/com/db1/poc/outbox/spring/    # OutboxAutoConfiguration, OutboxRelayProperties, OutboxGravador,
-│                                                  # OutboxGravada, OutboxDespachante, OutboxRecuperacao
-├── src/test/java/br/com/db1/poc/outbox/spring/    # OutboxAutoConfigurationTest, OutboxDespachanteTest
+│                                                  # OutboxGravada, OutboxDespachante, OutboxRecuperacao,
+│                                                  # InboxAutoConfiguration, InboxProperties, InboxDialects,
+│                                                  # SpringInboxTransactionExecutor, InboxConsumerLifecycle
+├── src/test/java/br/com/db1/poc/outbox/spring/    # OutboxAutoConfigurationTest, OutboxDespachanteTest,
+│                                                  # InboxAutoConfigurationTest, SpringInboxTransactionExecutorTest,
+│                                                  # FakeMessageSource
 └── .agents/                                       # skills para agentes
 ```
 
@@ -41,12 +45,13 @@ Dependências, plugins e recursos (`AutoConfiguration.imports`) ficam nos `pom.x
 
 ## Convenções
 
-- Todas as classes ficam no pacote `br.com.db1.poc.outbox.spring`, o mesmo da `OutboxRabbitConnectionFactoryConfiguration` de cada módulo, que é package-private e entra em `OutboxAutoConfiguration` por `@Import`.
+- Todas as classes ficam no pacote `br.com.db1.poc.outbox.spring`, o mesmo da `OutboxRabbitConnectionFactoryConfiguration` de cada módulo, que é package-private e entra em `OutboxAutoConfiguration` e em `InboxAutoConfiguration` por `@Import`.
 - Os nomes da integração são em português (`OutboxGravador`, `OutboxDespachante`, `OutboxRecuperacao`); a API da biblioteca é em inglês.
-- Todo bean de `OutboxAutoConfiguration` é declarado com `@ConditionalOnMissingBean`, para que a aplicação possa substituí-lo.
-- As chaves de configuração usam o prefixo `outbox.relay.*` da biblioteca, com os mesmos padrões.
-- Logs de publicação em português, com as chaves de MDC `messageId`, `correlationId`, `aggregateKey` e `traceId`.
-- Testes com sufixo `*Test` (surefire), sem banco nem broker: auto-configuração com `ApplicationContextRunner`; outbox, banco e publicador simulados em memória.
+- Todo bean de `OutboxAutoConfiguration` e de `InboxAutoConfiguration` é declarado com `@ConditionalOnMissingBean`, para que a aplicação possa substituí-lo.
+- `InboxAutoConfiguration` só registra beans com `inbox.consumer.queue` definida e um bean `InboxMessageHandler` (condições no nível da classe); a aplicação só com a outbox sobe sem nenhum bean do consumidor.
+- As chaves de configuração usam os prefixos `outbox.relay.*` e `inbox.consumer.*` da biblioteca, com os mesmos padrões.
+- Logs de publicação e de consumo em português, com as chaves de MDC `messageId`, `correlationId`, `aggregateKey` e `traceId`.
+- Testes com sufixo `*Test` (surefire), sem broker nem banco externo: auto-configuração com `ApplicationContextRunner`; outbox, publicador e `MessageSource` simulados em memória e a inbox sobre H2 em memória.
 - Código Java indentado com tabulação; comentários e Javadoc em português.
 
 ## Restrições globais
@@ -54,7 +59,7 @@ Dependências, plugins e recursos (`AutoConfiguration.imports`) ficam nos `pom.x
 - Uma alteração aqui muda os dois artefatos: ela precisa compilar e passar nos testes dos dois módulos, com APIs disponíveis no Spring Boot 3.x **e** no 4.x e no piso Java 17. O que difere entre as linhas vai para uma classe de mesmo nome e pacote em cada módulo, nunca para esta pasta.
 - Uma dependência nova usada por este código é declarada no `pom.xml` dos dois módulos.
 - A auto-configuração não instancia o relay por polling da biblioteca e não executa retenção, métricas Micrometer nem lease: a aplicação nunca usa os dois caminhos juntos, porque competiriam pelas mesmas linhas pendentes.
-- As tabelas da outbox são criadas por script DDL da aplicação; a auto-configuração não chama o `OutboxSchemaInstaller`.
+- As tabelas da outbox e a tabela `inbox` são criadas por script DDL da aplicação; a auto-configuração não chama o `OutboxSchemaInstaller` nem o `InboxSchemaInstaller`. A fila principal e a DLQ do consumidor também são declaradas pela aplicação.
 - Credenciais de banco e broker ficam em variáveis de ambiente ou `.env`, nunca versionadas.
 
 ## Comandos essenciais

@@ -20,7 +20,7 @@ O Mensageria Outbox é o módulo do lado **produtor** da entrega atômica de men
 2. Um **relay** lê a outbox e publica no broker, considerando a linha enviada somente depois da confirmação do broker (publisher confirm).
 3. O broker entrega a mensagem ao consumidor, que fica fora deste domínio.
 
-A publicação é **at-least-once**: a mesma mensagem pode ser publicada mais de uma vez, e o consumidor absorve as repetições pelo `messageId`. O módulo é isolado e autossuficiente: carrega a sua própria definição do envelope padrão, e a base é reaproveitada por um segundo caso (coordenação de vários passos com compensação), que reutiliza o envelope e o `correlationId`; esse caso está fora deste domínio.
+A publicação é **at-least-once**: a mesma mensagem pode ser publicada mais de uma vez, e o consumidor absorve as repetições pelo `messageId`. O lado produtor e o lado consumidor (domínio Mensageria Inbox) compartilham o artefato `mensageria-outbox-core`: os pacotes `br.com.db1.poc.outbox` e `br.com.db1.poc.inbox` são independentes entre si, e o envelope padrão (`Envelope`) e os utilitários comuns vivem no pacote `br.com.db1.poc.shared`. A base é reaproveitada por um segundo caso (coordenação de vários passos com compensação), que reutiliza o envelope e o `correlationId`; esse caso está fora deste domínio.
 
 O módulo cobre: envelope, inserção na outbox, interface do relay e as duas estratégias, lease de relay único, publicação com confirms, retry/backoff de publicação, retenção da outbox e métricas de publicação.
 

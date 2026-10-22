@@ -1,6 +1,6 @@
 ---
 name: mensageria-outbox-spring-boot-shared
-description: Contrato de negócio da integração Spring Boot da outbox, código comum dos artefatos mensageria-outbox-spring-boot3 e 4. Use ao alterar OutboxGravador.gravar e a gravação atômica na transação, OutboxDespachante e o envio após o commit, publisher confirm e sent_at, retry com backoff, ordem por aggregateKey, OutboxRecuperacao e a recuperação de pendentes no ApplicationReadyEvent, at-least-once e duplicidades, OutboxRelayProperties e as chaves outbox.relay.*, ou OutboxAutoConfiguration e seus beans.
+description: Contrato de negócio da integração Spring Boot da outbox e do consumidor (inbox), código comum dos artefatos mensageria-outbox-spring-boot3 e 4. Use ao alterar OutboxGravador.gravar e a gravação atômica na transação, OutboxDespachante e o envio após o commit, publisher confirm e sent_at, retry com backoff, ordem por aggregateKey, OutboxRecuperacao e a recuperação de pendentes no ApplicationReadyEvent, at-least-once e duplicidades, OutboxRelayProperties e as chaves outbox.relay.*, OutboxAutoConfiguration e seus beans, ou InboxAutoConfiguration, InboxProperties e as chaves inbox.consumer.*, SpringInboxTransactionExecutor, InboxConsumerLifecycle e a detecção do dialeto da inbox.
 metadata:
   author: clovis-cli
   type: domain-skill
@@ -14,20 +14,21 @@ metadata:
 
 ## Visão geral
 
-Esta pasta guarda o código-fonte comum da auto-configuração que integra a biblioteca `mensageria-outbox` (lado produtor do padrão outbox) a aplicações Spring Boot. Não é módulo Maven: os módulos `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x) acrescentam `src/main/java` e `src/test/java` daqui às próprias fontes, e o contrato descrito abaixo vale igual nos dois artefatos.
+Esta pasta guarda o código-fonte comum das auto-configurações que integram a biblioteca `mensageria-outbox-core` (lado produtor, pacote `outbox`, e lado consumidor, pacote `inbox`) a aplicações Spring Boot. Não é módulo Maven: os módulos `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x) acrescentam `src/main/java` e `src/test/java` daqui às próprias fontes, e o contrato descrito abaixo vale igual nos dois artefatos.
 
-A integração entrega três comportamentos:
+A integração entrega quatro comportamentos:
 
 1. **Gravação atômica:** a aplicação grava o dado de negócio e a linha da outbox na mesma transação local do seu banco, pelo `OutboxGravador`.
 2. **Envio após o commit:** cada linha confirmada é publicada de forma assíncrona no RabbitMQ, com publisher confirm, retry sem limite e ordem por `aggregateKey`.
 3. **Recuperação na inicialização:** as linhas que ficaram pendentes em execuções anteriores são publicadas pelo mesmo envio.
+4. **Consumo:** com `inbox.consumer.queue` e um bean `InboxMessageHandler`, o `InboxConsumer` da biblioteca sobe com o ciclo de vida do Spring e executa o tratador na transação Spring da aplicação, com o registro na inbox pela mesma conexão (regras R31 a R37).
 
 ### Fronteira
 
-- **Pertence a este contrato:** a gravação na transação Spring, o evento `OutboxGravada`, o despacho após o commit, a ordem por `aggregateKey`, a recuperação, as chaves `outbox.relay.*` lidas aqui e o registro dos beans em `OutboxAutoConfiguration`.
-- **Pertence à biblioteca** (`../mensageria-outbox/core/src/main/java/br/com/db1/poc/outbox/`): o envelope, o `OutboxWriter`, as consultas SQL do `SqlServerOutboxDialect`, o `RabbitMessagePublisher`, o `BackoffPolicy`, o `RabbitTopology` e o relay por polling.
+- **Pertence a este contrato:** a gravação na transação Spring, o evento `OutboxGravada`, o despacho após o commit, a ordem por `aggregateKey`, a recuperação, as chaves `outbox.relay.*` lidas aqui e o registro dos beans em `OutboxAutoConfiguration`; do lado consumidor, a `InboxAutoConfiguration`, as chaves `inbox.consumer.*`, o executor transacional Spring, o ciclo de vida do consumidor e a detecção do dialeto da inbox.
+- **Pertence à biblioteca** (`../mensageria-outbox/core/src/main/java/br/com/db1/poc/`): em `outbox/`, o `OutboxWriter`, as consultas SQL do `SqlServerOutboxDialect`, o `RabbitMessagePublisher`, o `BackoffPolicy` e o relay por polling; em `inbox/`, o `InboxConsumer`, o `InboxConfig`, a porta `MessageSource` e o adaptador `RabbitMessageSource`, os dialetos `H2InboxDialect` e `SqlServerInboxDialect`, o `InboxSchemaInstaller`, o `InboxMetrics`, o `BlockedKeys`, o retry com backoff e a DLQ; em `shared/`, o código comum à outbox e à inbox, do qual esta pasta importa `br.com.db1.poc.shared.envelope.Envelope` e `br.com.db1.poc.shared.rabbit.RabbitTopology`.
 - **Pertence a cada módulo:** o bean `outboxRabbitConnectionFactory` (classe `OutboxRabbitConnectionFactoryConfiguration`, que depende do pacote do `RabbitProperties` de cada linha) e o arquivo `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`.
-- **Pertence à aplicação:** o dado de negócio e o payload, a declaração das filas, a criação das tabelas da outbox por script e a configuração de `spring.datasource.*` e `spring.rabbitmq.*`.
+- **Pertence à aplicação:** o dado de negócio e o payload, a declaração das filas (as de destino da outbox e, no consumo, a fila principal e a DLQ), a criação das tabelas da outbox e da `inbox` por script, o bean `InboxMessageHandler` com o efeito de negócio e a configuração de `spring.datasource.*` e `spring.rabbitmq.*`.
 
 ## Regras de negócio
 
@@ -102,19 +103,43 @@ Numeração própria desta skill (R1, R2, ...).
 ### Compatibilidade entre as linhas do Spring Boot
 
 - **R29.** Todo código desta pasta compila e passa nos testes dos dois módulos: usa apenas APIs disponíveis no Spring Boot 3.x e no 4.x e no Java 17 (`--release 17`; o enforcer recusa bytecode acima de 17). O que difere entre as linhas fica fora desta pasta, em uma classe de mesmo nome e pacote em cada módulo.
-- **R30.** Os testes desta pasta (`OutboxAutoConfigurationTest` e `OutboxDespachanteTest`, sufixo `*Test`) rodam nos dois módulos, sem banco nem broker: a auto-configuração sobe com `ApplicationContextRunner`, e o despachante é exercitado com outbox, banco e publicador simulados em memória.
+- **R30.** Os testes desta pasta (`OutboxAutoConfigurationTest`, `OutboxDespachanteTest`, `InboxAutoConfigurationTest` e `SpringInboxTransactionExecutorTest`, sufixo `*Test`) rodam nos dois módulos, sem broker: as auto-configurações sobem com `ApplicationContextRunner`, o despachante é exercitado com outbox, banco e publicador simulados em memória, e o consumidor sobe com H2 em memória, `DataSourceTransactionManager` e uma `MessageSource` simulada.
+
+### Consumidor (inbox)
+
+- **R31.** `InboxAutoConfiguration` (`@AutoConfiguration`) é separada da `OutboxAutoConfiguration` e registrada no `AutoConfiguration.imports` de cada módulo; cada lado sobe só quando a aplicação o usa. Ela importa a `OutboxRabbitConnectionFactoryConfiguration` por `@Import`, e o bean `outboxRabbitConnectionFactory` é o mesmo da outbox, registrado uma vez. Todo bean dela é `@ConditionalOnMissingBean`.
+- **R32.** O `InboxConsumer` só é criado com `inbox.consumer.queue` definida e um bean `InboxMessageHandler` na aplicação. Sem um dos dois nenhum bean do consumidor é criado e o contexto sobe, inclusive uma aplicação só com a outbox.
+- **R33.** A auto-configuração registra, cada um substituível pela aplicação: o `InboxDialect`, o `InboxTransactionExecutor`, o `InboxMetrics`, o `BlockedKeys` (`InMemoryBlockedKeys`), o `MessageSource` (`RabbitMessageSource` sobre o `outboxRabbitConnectionFactory` e `inbox.consumer.confirm-timeout`) e o `InboxConsumer`, cujo início e fim o `InboxConsumerLifecycle` (`SmartLifecycle`) conduz com o ciclo de vida do Spring. O `InboxMetrics` usa o `MeterRegistry` da aplicação, ou um registro simples na falta dele.
+- **R34.** O dialeto é escolhido pelo `DatabaseMetaData.getDatabaseProductName` do `DataSource`: `Microsoft SQL Server` usa `SqlServerInboxDialect` e `H2` usa `H2InboxDialect`. Com outro produto, a subida do consumidor falha com mensagem que nomeia o produto detectado e os dois suportados.
+- **R35.** O `SpringInboxTransactionExecutor` executa o trabalho num `TransactionTemplate` do `PlatformTransactionManager` da aplicação e entrega a conexão de `DataSourceUtils.getConnection(dataSource)`: o tratador roda dentro da transação Spring, e o registro na inbox, o `JdbcTemplate` ou a sessão JPA participam da mesma transação. Exceção do tratador desfaz a transação; o ack só sai depois do commit.
+- **R36.** `InboxProperties` lê as chaves abaixo (`Duration` nas durações), com os mesmos padrões do `InboxConfig.fromProperties` da biblioteca, que recusa os valores inválidos com `IllegalArgumentException`:
+
+| Chave | Padrão | Uso |
+|---|---|---|
+| `inbox.consumer.queue` | obrigatória | fila principal (quorum, durável, declarada pela aplicação) |
+| `inbox.consumer.dead-letter-queue` | `<queue>.dlq` | DLQ (quorum, durável, declarada pela aplicação) |
+| `inbox.consumer.max-attempts` | `5` | tentativas de processamento por mensagem antes da DLQ (a primeira conta) |
+| `inbox.consumer.backoff.initial` | `200ms` | intervalo depois da primeira falha |
+| `inbox.consumer.backoff.multiplier` | `2.0` | fator de crescimento do intervalo (finito e maior ou igual a 1,0) |
+| `inbox.consumer.backoff.max` | `30s` | teto do intervalo |
+| `inbox.consumer.max-in-flight` | `50` | mensagens sem ack, igual ao `basicQos` |
+| `inbox.consumer.workers` | `8` | threads de trabalho das filas por chave |
+| `inbox.consumer.confirm-timeout` | `5s` | espera do confirm da publicação na DLQ |
+
+- **R37.** A auto-configuração não cria a tabela `inbox` nem chama o `InboxSchemaInstaller`: a tabela vem do script do dialeto, executado antes de a aplicação subir. A fila principal e a DLQ são declaradas pela aplicação; ao iniciar, o consumidor as confirma com `queueDeclarePassive` e a subida falha se alguma não existir. O bloqueio de chave da DLQ vive só na memória do processo (P7 de `../mensageria-outbox/.agents/context/pendencias.md`).
 
 ## Entidades e dados
 
 - **`OutboxGravada(long seq, Envelope envelope)`** — evento de aplicação de uma linha gravada, tratado depois do commit.
 - **Resultado de `OutboxDespachante.despachar(seq, envelope)`** — `CompletableFuture<Boolean>`: `true` quando a linha foi publicada e marcada, ou já estava marcada; `false` quando o broker confirmou e a marcação falhou; concluído com exceção quando a aplicação encerra antes do confirm. Nos dois últimos casos a linha permanece pendente.
+- **Tabela `inbox`** — `message_id` (chave primária) e `consumed_at`, no banco da aplicação consumidora, em H2 ou SQL Server; estrutura em `../mensageria-outbox/.agents/specs/003-mensageria-outbox-nucleo-inbox/data-model.md`.
 - **Tabela `outbox` (SQL Server)** — a integração usa `seq`, `aggregate_key` e `sent_at` (pendente com `sent_at` nulo, enviada com `sent_at` preenchido por `SYSUTCDATETIME()`) e o índice `IX_outbox_aggregate (aggregate_key, seq)`. As tabelas `outbox_lease` e `outbox_read_point` vêm no mesmo script e pertencem ao relay por polling.
 
 ## Integrações e dependências externas
 
-- **SQL Server:** banco da aplicação, que contém a outbox; o único dialeto registrado é o `SqlServerOutboxDialect`.
+- **SQL Server:** banco da aplicação, que contém a outbox; o único dialeto da outbox é o `SqlServerOutboxDialect`. A inbox aceita SQL Server ou H2.
 - **RabbitMQ:** broker com publisher confirms, exchange `direct` e filas quorum declaradas pela aplicação.
-- **Biblioteca `mensageria-outbox-core`:** envelope, gravação, consultas da outbox, publicador e política de backoff.
+- **Biblioteca `mensageria-outbox-core`:** envelope, gravação, consultas da outbox, publicador e política de backoff; do lado consumidor, o `InboxConsumer`, os dialetos da inbox e o adaptador RabbitMQ.
 - **Spring Framework e Spring Boot:** transação, eventos de aplicação, `ApplicationReadyEvent`, `@ConfigurationProperties` e auto-configuração.
 
 As precondições técnicas — o que precisa existir para o contrato acima funcionar e o efeito da ausência de cada uma — estão em [references/technical-dependencies.md](references/technical-dependencies.md).

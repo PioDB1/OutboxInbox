@@ -1,6 +1,6 @@
 # Contrato: mensagem publicada no RabbitMQ
 
-Contrato entre o `mensageria-outbox` (publica) e o `mensageria-inbox` (consome). Cada módulo carrega a própria definição do envelope; este documento é a referência comum do formato no broker.
+Contrato entre o `mensageria-outbox` (publica) e o `mensageria-inbox` (consome). Produtor e consumidor usam o mesmo `Envelope`, do pacote `br.com.db1.poc.shared` do `mensageria-outbox-core`; este documento é a referência comum do formato no broker.
 
 ## Corpo
 

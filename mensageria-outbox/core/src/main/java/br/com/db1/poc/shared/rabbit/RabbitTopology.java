@@ -29,4 +29,9 @@ public final class RabbitTopology {
         channel.queueDeclare(queue, true, false, false, QUORUM_ARGUMENTS);
         channel.queueBind(queue, exchange, routingKey);
     }
+
+    /** Declara uma fila quorum durável sem ligação a exchange, como a DLQ do consumidor. */
+    public static void declareQuorumQueue(Channel channel, String queue) throws IOException {
+        channel.queueDeclare(queue, true, false, false, QUORUM_ARGUMENTS);
+    }
 }

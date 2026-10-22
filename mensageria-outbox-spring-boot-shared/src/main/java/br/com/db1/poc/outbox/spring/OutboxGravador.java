@@ -13,8 +13,8 @@ import org.springframework.jdbc.support.SQLExceptionSubclassTranslator;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.write.OutboxWriter;
+import br.com.db1.poc.shared.envelope.Envelope;
 
 /**
  * Ponto de entrada da aplicação: grava o envelope na outbox dentro da transação do dado de negócio e agenda a

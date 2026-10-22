@@ -49,6 +49,13 @@
             <scope>test</scope>
             <version>${logback.version}</version>
         </dependency>
+        <!-- 2.2.224: última linha do H2 com bytecode Java 8 (a 2.3.x é recusada pelo enforcer de bytecode). -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+            <version>2.2.224</version>
+        </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>

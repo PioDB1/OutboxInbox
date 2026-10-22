@@ -23,10 +23,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.db1.poc.outbox.dialect.OutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.publish.MessagePublisher;
 import br.com.db1.poc.outbox.publish.PublishException;
 import br.com.db1.poc.outbox.publish.PublishableMessage;
+import br.com.db1.poc.shared.envelope.Envelope;
 
 /**
  * Ordem por {@code aggregateKey} do {@link OutboxDespachante}, com a outbox, o banco e o broker simulados em memória:

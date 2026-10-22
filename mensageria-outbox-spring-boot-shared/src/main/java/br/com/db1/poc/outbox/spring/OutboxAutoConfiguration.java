@@ -19,8 +19,8 @@ import com.rabbitmq.client.ConnectionFactory;
 
 import br.com.db1.poc.outbox.dialect.sqlserver.SqlServerOutboxDialect;
 import br.com.db1.poc.outbox.rabbit.RabbitMessagePublisher;
-import br.com.db1.poc.outbox.rabbit.RabbitTopology;
 import br.com.db1.poc.outbox.write.OutboxWriter;
+import br.com.db1.poc.shared.rabbit.RabbitTopology;
 
 /**
  * Integra a biblioteca {@code mensageria-outbox} ao Spring Boot: gravação na transação da aplicação

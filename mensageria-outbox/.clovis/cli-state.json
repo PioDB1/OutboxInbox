@@ -93,6 +93,10 @@
     {
       "slug": "002-mensageria-outbox-compatibilidade-java-8",
       "closedAt": "2026-10-15T12:41:59.079Z"
+    },
+    {
+      "slug": "004-mensageria-outbox-pacote-shared",
+      "closedAt": "2026-10-21T19:24:41.221Z"
     }
   ]
 }

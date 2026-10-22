@@ -8,9 +8,9 @@ metadata:
 
 # Mapa funcional
 
-A evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21 nos domínios, exceto o Mensageria Outbox, que tem Java 8 como piso; Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay, versionamento dos artefatos do componente) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo. Cada bloco traz o estado de implementação do domínio; só o Mensageria Outbox tem código.
+A evidência de todos os domínios vem do material fornecido (`spec-caso-a-outbox-inbox.md`, indexado em `business-input.md`, Fonte 1) e da organização pedida pelo usuário para a mensageria (`discovery-answers.md`, D9). As decisões transversais (Java 21 nos domínios, exceto a mensageria, que tem Java 8 como piso no `mensageria-outbox-core`; Maven, Spring Boot 3.x, ADRs, SQL Server em Docker para o relay, versionamento dos artefatos do componente) estão em `discovery-answers.md`; o efeito de cada uma está refletido nos blocos abaixo. Cada bloco traz o estado de implementação do domínio; só os dois domínios de mensageria têm código.
 
-A mensageria é dividida em dois domínios independentes, um por lado da entrega: o produtor (`mensageria-outbox`) e o consumidor (`mensageria-inbox`). Nenhum depende do outro; cada um carrega a própria definição do envelope padrão.
+A mensageria é dividida em dois domínios, um por lado da entrega: o produtor (`mensageria-outbox`) e o consumidor (`mensageria-inbox`). Os dois são implementados no mesmo artefato, `mensageria-outbox-core`, nos pacotes `br.com.db1.poc.outbox` e `br.com.db1.poc.inbox`; nenhum dos dois pacotes depende do outro, e ambos usam o envelope padrão (`Envelope`) e os utilitários do pacote comum `br.com.db1.poc.shared`.
 
 ## 1. Mensageria Outbox (`mensageria-outbox`)
 
@@ -37,7 +37,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - SQL Server — banco da outbox, do lease e do relay de Pagamentos, executado em Docker; as duas estratégias de relay dependem dos recursos `UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion`/`min_active_rowversion()`. O H2 não oferece esses recursos e não é usado para o relay.
 - RabbitMQ — broker com filas quorum e publisher confirms (acessado por adaptador).
 - Micrometer — métricas de publicação.
-- Java 8 (piso) e Maven multi-módulo — plataforma e build; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no módulo, com os adaptadores `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x), ambos com Java 17 como piso. Os demais domínios seguem em Java 21.
+- Java 8 (piso) e Maven multi-módulo — plataforma e build; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no módulo, com os adaptadores `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x), ambos com Java 17 como piso. Os domínios Pagamentos, Extrato e Reconciliação seguem em Java 21.
 
 **Dependências técnicas do domínio:**
 - Ambiente Docker com SQL Server e RabbitMQ (e Toxiproxy para testes) — sem ele o relay não é executável nem testável contra os recursos do SQL Server.
@@ -45,7 +45,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - ADRs — registram a escolha entre as estratégias de relay (critério de conclusão).
 - Convenção de logs estruturados com `messageId`, `correlationId` e `aggregateKey` — sem ela a rastreabilidade ponta a ponta (RF-A11) não existe.
 
-**Confiança:** alta para outbox, envelope e relay (requisitos explícitos); média para o envelope duplicado em cada módulo, que decorre da separação pedida pelo usuário e não de um requisito do spec.
+**Confiança:** alta para outbox, envelope e relay (requisitos explícitos).
 
 **Lacunas abertas:** o spec §14 pergunta se o código da PoC é descartável ou evolui para o starter interno. Não bloqueia a especificação.
 
@@ -55,9 +55,9 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 
 **Evidência no material fornecido:** `business-input.md` Fonte 1 — §2 (16-26), §4 (36-47), §5.2 tabela `inbox` (73-91), §6.1 (95-106), RF-A6 a RF-A8, RF-A10 e RF-A11 (§7, 126-132), §9 (148-153), tarefa 2 (§12, 222), cenários A-F2 e A-F6 e "Ordem por agregado" (§11, 190-193, 207-209, 214-217). A serialização por chave e o comportamento da chave em falha vêm de decisão humana (`discovery-answers.md`, D10 e D11).
 
-**Estado de implementação:** não implementado; o módulo `mensageria-inbox` não existe e permanece escopo planejado do componente (`discovery-answers.md`, D14).
+**Estado de implementação:** implementado no pacote `br.com.db1.poc.inbox` do artefato `br.com.db1.poc:mensageria-outbox-core:0.4.0-SNAPSHOT` (`mensageria-outbox/core/`), sem módulo Maven próprio: `InboxConsumer`, `InboxConfig`, `InboxMessageHandler`, executores de transação, dialetos H2 e SQL Server, `InboxSchemaInstaller`, adaptador RabbitMQ, retry com backoff, DLQ, `BlockedKeys` e métricas. A auto-configuração Spring (`InboxAutoConfiguration`, chaves `inbox.consumer.*`) está no código comum `mensageria-outbox-spring-boot-shared/` e registrada em `mensageria-outbox-spring-boot3` e `mensageria-outbox-spring-boot4`. O bloqueio de chave da DLQ vive só em memória (P7 de `pendencias.md`). A substituição do consumo próprio do `demooutboxinbox` é a P1 do próprio demo. Decisões de desenho: ADR 0002.
 
-**Dependências entre domínios:** nenhuma.
+**Dependências entre domínios:** `mensageria-outbox`, no sentido do artefato: o consumidor é entregue no mesmo `mensageria-outbox-core` e usa o `Envelope` e os utilitários do pacote `br.com.db1.poc.shared`; não há dependência de código entre os pacotes `inbox` e `outbox`.
 
 **Regras inferidas:**
 - O efeito de negócio e o registro na inbox são gravados na mesma transação local; o ack só ocorre depois do commit.
@@ -66,14 +66,16 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - O processamento é serializado por `aggregateKey` dentro do processo: cada chave tem a sua fila de execução em memória e só uma mensagem da chave é processada por vez; chaves diferentes rodam em paralelo. Se uma thread já processa uma mensagem da chave, a seguinte da mesma chave aguarda o fim da anterior (commit e ack, ou falha). A fila por chave respeita o limite de mensagens em voo.
 - Retry com backoff e DLQ após limite configurável de tentativas. Durante o retry, a chave espera (a ordem é preservada) e as demais chaves seguem. Depois que a mensagem vai para a DLQ, as mensagens seguintes da mesma chave também vão para a DLQ, para revisão manual; mensagem inválida (veneno) não impede as demais chaves.
 - Métricas de consumo: duplicatas descartadas, mensagens em DLQ e tentativas de retry. `correlationId` e `traceId` propagados nos logs do consumo.
-- O módulo não depende de Spring Boot e conhece o RabbitMQ apenas por interface de consumo; o acesso à inbox é isolado por dialeto (H2 em Extrato).
+- O consumidor não depende de Spring Boot e conhece o RabbitMQ apenas por interface de consumo; o acesso à inbox é isolado por dialeto (H2 em Extrato, SQL Server no banco do `demooutboxinbox`).
+- O bloqueio de chave da DLQ vive só na memória do processo: o reinício libera as chaves bloqueadas e não há liberação durante a execução (P7 de `pendencias.md`).
 - O consumidor não cresce em memória sem limite (limite de mensagens em voo e de heap/memória direta).
 
 **Dependências externas relevantes:**
-- H2 em arquivo — banco da inbox onde os recursos exclusivos do SQL Server não são necessários; o módulo precisa de dialeto para ele. O DDL do spec (`UNIQUEIDENTIFIER`, `DATETIME2`) precisa de equivalente H2.
+- H2 em arquivo — banco da inbox onde os recursos exclusivos do SQL Server não são necessários; o consumidor tem dialeto para ele. O DDL do spec (`UNIQUEIDENTIFIER`, `DATETIME2`) tem equivalente H2 (`UUID`, `TIMESTAMP`).
+- SQL Server — banco da inbox da aplicação consumidora que já o usa (banco do `demooutboxinbox`), com dialeto próprio.
 - RabbitMQ — broker com filas quorum e ack manual (acessado por adaptador).
 - Micrometer — métricas de consumo.
-- Java 21 e Maven multi-módulo — plataforma e build; sem Spring Boot no módulo, com adaptador fino para Spring Boot 3.x.
+- Java 8 (piso) e Maven multi-módulo — plataforma e build do `mensageria-outbox-core`; suíte verificada nos JDKs 8, 11, 17, 21 e 25; sem Spring Boot no `core`, com os adaptadores `mensageria-outbox-spring-boot3` (Spring Boot 3.x) e `mensageria-outbox-spring-boot4` (Spring Boot 4.x), ambos com Java 17 como piso.
 
 **Dependências técnicas do domínio:**
 - Ambiente Docker com RabbitMQ (e Toxiproxy para testes) — sem ele o consumidor não é executável nem testável contra filas quorum e ack manual.
@@ -81,9 +83,9 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 - Consumidor com ack manual — sem ele a garantia de ack após commit não existe.
 - Convenção de logs estruturados com `messageId`, `correlationId` e `aggregateKey` — sem ela a rastreabilidade ponta a ponta não existe.
 
-**Confiança:** alta para inbox, dedup, ack e retry/DLQ (requisitos explícitos); média para o envelope duplicado em cada módulo e para o dialeto H2, que decorrem da separação pedida e da restrição declarada, não de requisito do spec.
+**Confiança:** alta para inbox, dedup, ack e retry/DLQ (requisitos explícitos); média para o dialeto H2, que decorre da restrição declarada e não de requisito do spec.
 
-**Lacunas abertas:** nenhuma.
+**Lacunas abertas:** o armazenamento do bloqueio de chave além da vida do processo e a liberação da chave depois da revisão manual (P7 de `pendencias.md`), sem decisão.
 
 ## 3. Pagamentos (`pagamentos`)
 
@@ -179,7 +181,7 @@ A mensageria é dividida em dois domínios independentes, um por lado da entrega
 ## Sugestão de ordem de implementação
 
 1. `mensageria-outbox` — envelope, outbox, relay com as duas estratégias, lease, publicação com confirms, retry de publicação, retenção e métricas.
-2. `mensageria-inbox` — envelope, consumidor com ack manual, inbox, dedup, retry/DLQ e métricas; independente do `mensageria-outbox`, pode ser feito em paralelo.
+2. `mensageria-inbox` — consumidor com ack manual, inbox, dedup, retry/DLQ e métricas, no mesmo artefato `mensageria-outbox-core`, depois do pacote comum `shared` e usando o `Envelope` dele; os pacotes `inbox` e `outbox` não dependem um do outro.
 3. `pagamentos` — produtor do evento, sobre o `mensageria-outbox`.
 4. `extrato` — consumidor do evento, sobre o `mensageria-inbox`.
 5. `reconciliacao` — verifica as invariantes sobre os dois bancos e valida a suíte de falhas.

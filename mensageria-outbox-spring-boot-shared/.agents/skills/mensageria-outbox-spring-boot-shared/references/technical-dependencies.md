@@ -1,4 +1,4 @@
-# Dependências técnicas da integração Spring Boot da outbox
+# Dependências técnicas da integração Spring Boot da outbox e do consumidor
 
 > **Maintaining this file**
 >
@@ -15,4 +15,8 @@ Cada item diz o que é a dependência e o que deixa de funcionar quando ela falt
 7. **`com.rabbitmq:amqp-client` 5.37.0 no classpath da aplicação** — é a versão com que a biblioteca é compilada e testada; o BOM do Spring Boot gerencia versões anteriores (5.25.0 no 3.5.16, 5.30.0 no 4.1.1). Sem a fixação na aplicação, a publicação roda sobre uma versão do cliente não verificada.
 8. **Contexto Spring Boot que publica o `ApplicationReadyEvent`** — sem ele a recuperação não roda: as linhas pendentes de execuções anteriores não são publicadas e retêm as posteriores da mesma `aggregateKey`.
 9. **Relay por polling da biblioteca desligado na mesma aplicação** (`RelayFactory` não instanciado) — com os dois ativos, ambos competem pelas mesmas linhas pendentes, com políticas de envio diferentes.
-10. **Padrão de log da aplicação com as chaves de MDC `messageId`, `correlationId`, `aggregateKey` e `traceId`** — a integração preenche as chaves em cada tentativa; sem elas no padrão de log, a publicação de cada mensagem não é rastreável.
+10. **Padrão de log da aplicação com as chaves de MDC `messageId`, `correlationId`, `aggregateKey` e `traceId`** — a integração preenche as chaves em cada tentativa de publicação e de consumo; sem elas no padrão de log, cada mensagem não é rastreável.
+11. **Bean `InboxMessageHandler` e `inbox.consumer.queue`** — sem um dos dois a auto-configuração não cria o consumidor e a aplicação não consome.
+12. **`DataSource` de H2 ou de SQL Server com a tabela `inbox` criada por script** antes de subir a aplicação (scripts em `../mensageria-outbox/core/src/main/resources/br/com/db1/poc/inbox/schema/<dialeto>/schema.sql`, aplicados por `InboxSchemaInstaller.install`) — com outro produto de banco a subida do consumidor falha; sem a tabela, toda mensagem falha e segue o retry e a DLQ.
+13. **Fila principal e DLQ quorum declaradas pela aplicação** (a DLQ com `RabbitTopology.declareQuorumQueue(Channel, String)`) — o consumidor as confirma com `queueDeclarePassive` ao iniciar; se alguma não existir, a subida do consumidor falha.
+14. **Driver JDBC do banco da inbox no classpath da aplicação** (H2 ou `mssql-jdbc`) — o `core` não o traz para o H2; sem ele o `DataSource` não abre conexão.

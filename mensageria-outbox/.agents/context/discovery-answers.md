@@ -1,6 +1,6 @@
 ---
 name: discovery-answers
-description: Memória da descoberta funcional da PoC outbox/inbox (Pagamentos → Extrato) — objetivo, escopo, restrições (H2 em arquivo onde possível, SQL Server em Docker para o relay, Java 21, Maven, Spring Boot 3.x, ADRs), decisões transversais com destino, módulos de mensageria separados em outbox e inbox, ordem por aggregateKey no consumidor, organização das skills por pasta, versionamento dos artefatos do componente e registro das doze decisões humanas.
+description: Memória da descoberta funcional da PoC outbox/inbox (Pagamentos → Extrato) — objetivo, escopo, restrições (H2 em arquivo onde possível, SQL Server em Docker para o relay, Java 21, Maven, Spring Boot 3.x, ADRs), decisões transversais com destino, domínios de mensageria outbox e inbox no mesmo artefato, ordem por aggregateKey no consumidor, organização das skills por pasta, versionamento dos artefatos do componente e registro das treze decisões humanas.
 metadata:
   author: clovis-cli
   responsibility: "Durable memory of the functional-discovery context and decisions: objective, scope, declared restrictions, validated cross-cutting decisions (with destination), documentation forms to maintain and the log of human decisions resolved in the gap loop. Source re-read by the following stages; its restrictions take precedence over later inferences."
@@ -11,7 +11,7 @@ metadata:
 ## Objetivo e escopo
 
 - **Objetivo:** POC (projeto greenfield) que valida o padrão outbox/inbox como substituto da coordenação XA. Duas aplicações, cada uma com seu banco, devem manter consistência eventual correta (sem perda e sem efeito duplicado) sob falhas, sem transação distribuída. Fonte: `spec-caso-a-outbox-inbox.md` §1 (ver `business-input.md`).
-- **Escopo (projeto inteiro):** aplicação Pagamentos, aplicação Extrato, dois módulos de mensageria independentes — `mensageria-outbox` (lado produtor: envelope, outbox, relay, lease, publicação com retry/backoff, retenção, métricas de publicação) e `mensageria-inbox` (lado consumidor: envelope, consumidor com ack manual, inbox, dedup, retry/backoff, DLQ, métricas de consumo) — e job de reconciliação.
+- **Escopo (projeto inteiro):** aplicação Pagamentos, aplicação Extrato, dois domínios de mensageria, implementados no mesmo artefato `mensageria-outbox-core` — `mensageria-outbox` (lado produtor: envelope, outbox, relay, lease, publicação com retry/backoff, retenção, métricas de publicação) e `mensageria-inbox` (lado consumidor: consumidor com ack manual, inbox, dedup, retry/backoff, DLQ, métricas de consumo; usa o envelope do pacote `shared`) — e job de reconciliação.
 - **Fora de escopo:** coordenação de vários passos com compensação (Caso B), CDC/Debezium, ponte ActiveMQ ↔ RabbitMQ, replicação/sincronização de bancos e qualquer meta de latência ou throughput (as métricas são observação).
 
 ## Restrições declaradas
@@ -22,7 +22,7 @@ metadata:
 | Um banco/schema separado por aplicação; sem transação local entre Pagamentos e Extrato | Spec §3 | Convenção em `AGENTS.md`; domínios Pagamentos e Extrato |
 | RabbitMQ com filas quorum, publisher confirms e ack manual | Spec §3 | Domínios `mensageria-outbox` (publisher confirms) e `mensageria-inbox` (ack manual); filas quorum em ambos |
 | Sem XA, sem JTA, sem transaction manager externo | Spec §3 | Convenção em `AGENTS.md` |
-| `mensageria-outbox` e `mensageria-inbox` sem dependência de Spring Boot; adaptadores finos por framework | Spec §3 | Domínios `mensageria-outbox` e `mensageria-inbox` |
+| Os lados produtor e consumidor do `mensageria-outbox-core` sem dependência de Spring Boot; adaptadores finos por framework | Spec §3 | Domínios `mensageria-outbox` e `mensageria-inbox` |
 | Núcleo conhece o RabbitMQ apenas por interface de publicação (outbox) e de consumo (inbox) | Spec §9 (Portabilidade) | Domínios `mensageria-outbox` e `mensageria-inbox` |
 | Nenhum número de desempenho é meta | Spec §3 e §9.1 | Convenção em `AGENTS.md` |
 | Relay e consumidor sem crescimento ilimitado de memória; limites explícitos de heap e memória direta | Spec §9 | Domínios `mensageria-outbox` (relay), `mensageria-inbox` (consumidor), Pagamentos e Extrato |
@@ -32,23 +32,23 @@ metadata:
 
 | Id | Decisão | Destino |
 |---|---|---|
-| D1 | Java 21 como versão mínima suportada, exceto no `mensageria-outbox`, que tem Java 8 como piso. Os módulos `mensageria-outbox` e `mensageria-inbox` não dependem de Spring Boot. | Convenção em `AGENTS.md` |
-| D2 | Maven multi-módulo (`mensageria-outbox`, `mensageria-inbox`, pagamentos, extrato, reconciliação). | Convenção em `AGENTS.md` |
-| D3 | Spring Boot 3.x (compatível com Java 21) nas aplicações Pagamentos e Extrato; Pagamentos consome o `mensageria-outbox` (Java 8 como piso, usado pelo adaptador de Pagamentos em Spring Boot 3.x) e Extrato consome o `mensageria-inbox`, cada um por adaptador fino. | Domínios Pagamentos e Extrato; convenção em `AGENTS.md` |
+| D1 | Java 21 como versão mínima suportada, exceto no `mensageria-outbox-core`, que hospeda o lado produtor e o consumidor (`mensageria-inbox`) e tem Java 8 como piso. O `core` não depende de Spring Boot. Decisão de 2026-10-21 para o consumidor (g13). | Convenção em `AGENTS.md` |
+| D2 | Maven multi-módulo (`mensageria-outbox` com o `core` que hospeda produtor e consumidor, pagamentos, extrato, reconciliação); o `mensageria-inbox` não tem módulo Maven próprio. Decisão de 2026-10-21 (g13). | Convenção em `AGENTS.md` |
+| D3 | Spring Boot 3.x (compatível com Java 21) nas aplicações Pagamentos e Extrato; Pagamentos usa o lado produtor e Extrato o lado consumidor do `mensageria-outbox-core` (Java 8 como piso), cada um por adaptador fino. | Domínios Pagamentos e Extrato; convenção em `AGENTS.md` |
 | D4 | ADRs como forma de documentação complementar, incluindo a escolha entre as estratégias de relay (spec §8). | `technicalSkills`: `registro-de-adrs` |
 | D5 | O relay de Pagamentos usa SQL Server executado em Docker, porque as duas estratégias de relay dependem de recursos próprios do SQL Server (`UPDLOCK`/`READPAST`/`ROWLOCK` e `rowversion` com `min_active_rowversion()`), ausentes no H2. Onde esses recursos não são necessários (inbox de Extrato e Reconciliação), vale a restrição de H2 em arquivo. | `technicalSkills`: `ambiente-docker-sqlserver-rabbitmq`; domínios `mensageria-outbox`, `mensageria-inbox`, Pagamentos, Extrato e Reconciliação |
 | D6 | Ambiente de teste com Testcontainers (SQL Server, RabbitMQ) e Toxiproxy para injeção de falhas, com suíte repetível dos cenários A-F1 a A-F7. A compatibilidade de Testcontainers e Micrometer é verificada pela suíte do `mensageria-outbox` nos JDKs 8, 11, 17, 21 e 25. | `technicalSkills`: `testes-de-falha-resiliencia` |
 | D7 | Observabilidade: logs estruturados com `messageId`, `correlationId`, `aggregateKey`; propagação de `correlationId` e `traceId` nos headers e logs; métricas em Micrometer (publicação no `mensageria-outbox`, consumo no `mensageria-inbox`). | Convenção em `AGENTS.md`; domínios `mensageria-outbox` e `mensageria-inbox` |
 | D8 | Ambas as estratégias de relay (claim e ponto de leitura) são implementadas atrás de uma única interface, para comparação. | Domínio `mensageria-outbox` |
-| D9 | A mensageria é dividida em dois módulos independentes: `mensageria-outbox` (produtor) e `mensageria-inbox` (consumidor). Cada módulo carrega a própria definição do envelope padrão, de modo que nenhum dependa do outro. | Domínios `mensageria-outbox` e `mensageria-inbox`; convenção em `AGENTS.md` (estrutura de módulos) |
+| D9 | A mensageria é dividida em dois domínios: `mensageria-outbox` (produtor, pacote `br.com.db1.poc.outbox`) e `mensageria-inbox` (consumidor, pacote `br.com.db1.poc.inbox`). Os dois vivem no mesmo artefato `mensageria-outbox-core` e no mesmo contexto de beans do Spring; usam o `Envelope` e os utilitários do pacote `br.com.db1.poc.shared`, e os pacotes `outbox` e `inbox` não dependem um do outro. Decisão de 2026-10-21 (g13). | Domínios `mensageria-outbox` e `mensageria-inbox`; convenção em `AGENTS.md` (estrutura de módulos) |
 | D10 | O consumidor serializa o processamento por `aggregateKey` dentro do processo: cada chave tem a sua fila de execução em memória e só uma mensagem da chave é processada por vez; chaves diferentes são processadas em paralelo. Quando uma thread já processa uma mensagem de uma chave, a mensagem seguinte da mesma chave aguarda o fim da anterior (commit e ack, ou falha). A fila de execução por chave respeita o limite de mensagens em voo (memória limitada). | Domínio `mensageria-inbox`; domínio Extrato |
 | D11 | Falha na mensagem de uma chave: a chave espera durante o retry com backoff, preservando a ordem, e as demais chaves seguem. Depois que a mensagem vai para a DLQ por exceder o limite de tentativas, as mensagens seguintes da mesma chave também vão para a DLQ, para revisão manual. | Domínio `mensageria-inbox`; domínio Extrato |
 | D12 | Skills organizadas por pasta: cada pasta do componente (`mensageria-outbox`, `mensageria-outbox-spring-boot-shared`, `mensageria-outbox-spring-boot3`, `mensageria-outbox-spring-boot4`) e a demonstração `demooutboxinbox` têm o próprio `AGENTS.md` e o próprio `.agents/`, com uma skill de domínio por pasta. | Convenção em `AGENTS.md` (estrutura de `.agents/`) |
 | D13 | Versionamento: todos os artefatos do componente estão em 0.4.0-SNAPSHOT (`mensageria-outbox`, `mensageria-outbox-core`, `mensageria-outbox-spring-boot3`, `mensageria-outbox-spring-boot4`). Os adaptadores têm o `mensageria-outbox` como POM pai, que fixa `com.rabbitmq:amqp-client` 5.37.0 no `dependencyManagement`. | Convenção em `AGENTS.md` (stack); `README.md` (artefatos) |
-| D14 | `mensageria-inbox` e a skill `testes-de-falha-resiliencia` permanecem como escopo planejado do componente; o módulo inbox e a suíte de falhas não têm código no repositório. | Domínio `mensageria-inbox`; `technicalSkills`: `testes-de-falha-resiliencia` |
+| D14 | O consumidor (`mensageria-inbox`) é implementado no `mensageria-outbox-core`, no mesmo artefato e no mesmo contexto de beans da outbox, com Java 8 como piso (decisão de 2026-10-21, g13). A skill `testes-de-falha-resiliencia` e a suíte de falhas completa A-F1 a A-F7 permanecem como escopo planejado do componente, sem código no repositório. | Domínio `mensageria-inbox`; `technicalSkills`: `testes-de-falha-resiliencia` |
 | D15 | Defeitos encontrados na validação de 2026-10-20 são registrados como pendências, sem correção nesta rodada. | `.agents/context/pendencias.md` |
 
-Implicação de D5: as tabelas e os acessos são isolados por dialeto de banco em cada módulo — o `mensageria-outbox` (outbox, lease e ponto de leitura) usa SQL Server; o `mensageria-inbox` usa o dialeto do banco da aplicação consumidora (H2 em Extrato). Credenciais dos contêineres ficam em variáveis de ambiente ou `.env`, nunca versionadas.
+Implicação de D5: as tabelas e os acessos são isolados por dialeto de banco em cada domínio — a outbox (outbox, lease e ponto de leitura) usa SQL Server; a inbox usa o dialeto do banco da aplicação consumidora (H2 em Extrato, SQL Server no `demooutboxinbox`). Credenciais dos contêineres ficam em variáveis de ambiente ou `.env`, nunca versionadas.
 
 ## Formas de documentação a manter
 
@@ -75,8 +75,9 @@ Nenhum detectado. Evidência: ausência de `.specify/`, `openspec/` e de qualque
 | g10 · Versionamento dos artefatos | Qual versão e qual hierarquia de POM valem para os artefatos do componente? | Todos em 0.3.0-SNAPSHOT; os adaptadores têm o `mensageria-outbox` como POM pai, que fixa `amqp-client` 5.37.0 (D13). Decidido em 2026-10-20. |
 | g11 · Escopo sem código | O que fazer com `mensageria-inbox` e com a skill `testes-de-falha-resiliencia`, que não têm código correspondente? | Permanecem como escopo planejado do componente (D14). Decidido em 2026-10-20. |
 | g12 · Defeitos da validação | Os defeitos encontrados na validação de 2026-10-20 são corrigidos na mesma rodada? | Não; ficam registrados em `.agents/context/pendencias.md`, sem correção nesta rodada (D15). Decidido em 2026-10-20. |
+| g13 · Consumidor no `core` e chaves bloqueadas (P7) | Onde o consumidor é implementado, e como tratar o estado das chaves bloqueadas por mensagem na DLQ além da vida do processo? | O consumidor fica no `mensageria-outbox-core` (pacote `br.com.db1.poc.inbox`), no mesmo artefato e no mesmo contexto de beans da outbox, com Java 8 como piso (D1, D2, D9, D14). O bloqueio de chave vive só em memória, atrás da interface `BlockedKeys`; o armazenamento além do reinício e a liberação da chave seguem como P7 de `pendencias.md`, sem decisão. Decidido em 2026-10-21. |
 
 ## Perguntas do spec §14 sem decisão
 
 - Quem escreve o reconciliador (o spec recomenda alguém que não implementou o fluxo). Decisão organizacional, não bloqueia a especificação.
-- Se o código da PoC é descartável ou evolui para o starter interno. Não bloqueia a especificação; o isolamento de `mensageria-outbox` e `mensageria-inbox` já os mantém reaproveitáveis.
+- Se o código da PoC é descartável ou evolui para o starter interno. Não bloqueia a especificação; o isolamento entre os pacotes `outbox` e `inbox` do `core` já os mantém reaproveitáveis.

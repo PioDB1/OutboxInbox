@@ -23,9 +23,9 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import com.rabbitmq.client.ConnectionFactory;
 
 import br.com.db1.poc.outbox.dialect.sqlserver.SqlServerOutboxDialect;
-import br.com.db1.poc.outbox.envelope.Envelope;
 import br.com.db1.poc.outbox.rabbit.RabbitMessagePublisher;
 import br.com.db1.poc.outbox.write.OutboxWriter;
+import br.com.db1.poc.shared.envelope.Envelope;
 
 /**
  * Sobe a auto-configuração sem banco nem broker: o publicador é fornecido pela configuração do teste, o que dispensa
@@ -105,7 +105,8 @@ class OutboxAutoConfigurationTest {
 				"META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports")) {
 			assertThat(imports).isNotNull();
 			assertThat(new String(imports.readAllBytes(), StandardCharsets.UTF_8))
-					.contains(OutboxAutoConfiguration.class.getName());
+					.contains(OutboxAutoConfiguration.class.getName())
+					.contains(InboxAutoConfiguration.class.getName());
 		}
 	}
 
